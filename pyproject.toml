@@ -1,0 +1,17 @@
+[project]
+name = "uncoiled"
+version = "0.1.0"
+description = "Python status is: coiled and ready"
+readme = "README.md"
+authors = [
+    { name = "Jonathan Sharpe", email = "mail@jonrshar.pe" }
+]
+requires-python = ">=3.8"
+dependencies = []
+
+[project.scripts]
+uncoiled = "uncoiled:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
