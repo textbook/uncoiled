@@ -5,14 +5,14 @@ import uvicorn
 from fastapi import APIRouter, FastAPI
 
 
-@uncoiled.factory
+@uncoiled.register
 class HealthController:
 
     def get_health(self) -> None:
         return None
 
 
-@uncoiled.factory
+@uncoiled.register
 def create_app(routers: uncoiled.Every[APIRouter]) -> FastAPI:
     app = FastAPI()
     for router in routers:
@@ -20,7 +20,7 @@ def create_app(routers: uncoiled.Every[APIRouter]) -> FastAPI:
     return app
 
 
-@uncoiled.factory
+@uncoiled.register
 def create_health_router(controller: HealthController) -> APIRouter:
     health_router = APIRouter()
 
@@ -31,7 +31,7 @@ def create_health_router(controller: HealthController) -> APIRouter:
     return health_router
 
 
-@uncoiled.factory
+@uncoiled.register
 class Server(uvicorn.Server):
 
     def __init__(self, app: FastAPI) -> None:

@@ -1,20 +1,21 @@
 from __future__ import annotations
 
 import typing as tp
+from abc import ABCMeta
 from collections import defaultdict
 from copy import deepcopy
 from functools import partial, partialmethod
 from inspect import isclass
 
-from typing_extensions import ParamSpec
+import typing_extensions as tx
 
 RETURN_ANNOTATION = "return"
 
-P = ParamSpec("P")
+P = tx.ParamSpec("P")
 T = tp.TypeVar("T")
 
 
-class Every(tp.Sequence[T], tp.Generic[T]):
+class Every(tp.Sequence[T], tp.Generic[T], metaclass=ABCMeta):
     pass
 
 
@@ -33,26 +34,34 @@ class Container:
         if tp.get_origin(type_) is Every:
             (type_,) = tp.get_args(type_)
             multi = True
-        created = [
-            partial(create, **self._resolve(create))
-            for create in self._registrations.get(_name(type_))
-        ]
+        creations = self._registrations.get(_name(type_))
+        if creations is None:
+            raise TypeError(f"type {_name(type_)!r} is not registered")
+        created = [partial(create, **self._resolve(create)) for create in creations]
         return [create() for create in created] if multi else created[0]()
+
+    def inject(
+        self,
+        func: tp.Callable[P, T],
+    ) -> tp.Callable[[], T]:
+        return partial(func, **self._resolve(func))
 
     def overload(
         self,
         create: tp.Callable[P, T],
         with_factory: tp.Callable[P, T],
     ) -> Container:
-        target = _target_type(create)
+        targets = _target_types(create)
         registrations = deepcopy(self._registrations)
-        registrations[_name(target)] = [with_factory]
+        for target in targets:
+            registrations[_name(target)] = [with_factory]
         return type(self)(registrations)
 
     def register(self, create: tp.Callable[P, T]) -> tp.Callable[[], T]:
-        target = _target_type(create)
-        self._registrations[_name(target)].append(create)
-        return partial(self.get, type_=target)
+        targets = _target_types(create)
+        for target in targets:
+            self._registrations[_name(target)].append(create)
+        return partial(self.get, type_=targets[0])
 
     def _resolve(self, create: tp.Type[T]) -> tp.Mapping[str, T]:
         return {
@@ -69,7 +78,11 @@ def get(type_: tp.Type[T]) -> T:
     return _default_container.get(type_)
 
 
-def factory(create: tp.Callable[P, T]) -> tp.Callable[P, T]:
+def inject(func: tp.Callable[P, T]) -> tp.Callable[[], T]:
+    return _default_container.inject(func)
+
+
+def register(create: tp.Callable[P, T]) -> tp.Callable[P, T]:
     """Register the class or function as a factory."""
     _default_container.register(create)
     return create
@@ -99,11 +112,15 @@ def _name(obj: tp.Any) -> str:
     return f"{module}.{obj.__qualname__}"
 
 
-def _target_type(obj: tp.Union[tp.Type[T], tp.Callable[..., T]]) -> tp.Type[T]:
+def _target_types(
+    obj: tp.Union[tp.Type[T], tp.Callable[..., T]],
+) -> tp.List[tp.Type[T]]:
     """Get the target type of the object.
 
     - Classes provide their instances
     - Functions provide their return types
 
     """
-    return obj if isclass(obj) else obj.__annotations__[RETURN_ANNOTATION]
+    if isclass(obj):
+        return [cls for cls in obj.mro() if cls is not object]
+    return [obj.__annotations__[RETURN_ANNOTATION]]
