@@ -99,7 +99,7 @@ def _name(obj: tp.Any) -> str:
     return f"{module}.{obj.__qualname__}"
 
 
-def _target_type(obj: tp.Any) -> T:
+def _target_type(obj: tp.Union[tp.Type[T], tp.Callable[..., T]]) -> tp.Type[T]:
     """Get the target type of the object.
 
     - Classes provide their instances
