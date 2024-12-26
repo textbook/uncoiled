@@ -22,6 +22,7 @@ build-backend = "setuptools.build_meta"
 
 [dependency-groups]
 dev = [
+    "black>=24.8.0",
     "fastapi>=0.115.5",
     "httpx>=0.27.2",
     "mypy>=1.13.0",

@@ -31,7 +31,7 @@ class Container:
     def get(self, type_: tp.Type[T]) -> T:
         multi = False
         if tp.get_origin(type_) is Every:
-            type_, = tp.get_args(type_)
+            (type_,) = tp.get_args(type_)
             multi = True
         created = [
             partial(create, **self._resolve(create))
