@@ -7,7 +7,9 @@ authors = [
     { name = "Jonathan Sharpe", email = "mail@jonrshar.pe" }
 ]
 requires-python = ">=3.8"
-dependencies = []
+dependencies = [
+    "typing-extensions>=4.12.2",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: ISC License (ISCL)",
