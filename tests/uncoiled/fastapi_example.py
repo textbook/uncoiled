@@ -39,4 +39,4 @@ class Server(uvicorn.Server):
 
 
 if __name__ == "__main__":
-    uncoiled.get(Server).run()
+    uncoiled.get(uvicorn.Server).run()
