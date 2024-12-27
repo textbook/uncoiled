@@ -87,7 +87,12 @@ class Container:
         name = None
         if hasattr(obj, "__metadata__"):
             if tp.get_origin(obj.__metadata__[0]) is EnvVar:
-                var_name = tp.get_args(obj.__metadata__[0])[0].__forward_arg__
+                var_arg = tp.get_args(obj.__metadata__[0])[0]
+                var_name = (
+                    var_arg.__forward_arg__
+                    if isinstance(var_arg, tp.ForwardRef)
+                    else var_arg
+                )
                 name = f"{cls._canonical_name(EnvVar)}.{var_name}"
             else:
                 raise NotImplementedError(
