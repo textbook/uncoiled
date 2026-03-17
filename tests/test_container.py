@@ -66,6 +66,16 @@ class TestContainerRegistration:
         with pytest.raises(ValueError, match="request"):
             c.register_factory(Repository, return_type=Repository, scope=Scope.REQUEST)
 
+    def test_register_rejects_invalid_init_method(self) -> None:
+        c = Container()
+        with pytest.raises(ValueError, match=r"init_method.*nonexistent.*Repository"):
+            c.register(Repository, init_method="nonexistent")
+
+    def test_register_rejects_invalid_destroy_method(self) -> None:
+        c = Container()
+        with pytest.raises(ValueError, match=r"destroy_method.*nonexistent"):
+            c.register(Repository, destroy_method="nonexistent")
+
 
 class TestContainerResolution:
     def test_singleton_scope(self) -> None:
