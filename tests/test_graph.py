@@ -39,6 +39,16 @@ class CycleB:
         self.a = a
 
 
+class ExtraService:
+    pass
+
+
+class NeedsOptThenReq:
+    def __init__(self, opt: Repository | None, req: ExtraService) -> None:
+        self.opt = opt
+        self.req = req
+
+
 class TestBuildGraph:
     def test_valid_graph_no_failures(self) -> None:
         registrations = _make_registrations(
@@ -231,6 +241,20 @@ class TestBuildGraph:
             ComponentNode(impl=A, provides=A),
         )
         assert build_graph(registrations) == []
+
+    def test_unregistered_optional_does_not_block_required_failure(self) -> None:
+        """An unregistered optional dep followed by an unregistered required dep.
+
+        The continue on the optional skip (L60) must not become a break,
+        otherwise the required dep failure would go unreported.
+        """
+        registrations = _make_registrations(
+            ComponentNode(impl=NeedsOptThenReq, provides=NeedsOptThenReq),
+        )
+        failures = build_graph(registrations)
+        assert len(failures) == 1
+        assert failures[0].kind is FailureKind.MISSING
+        assert "ExtraService" in failures[0].message
 
 
 class TestValidateGraph:
