@@ -61,8 +61,10 @@ class Container:
         )
         self._registrations[key].dependencies = inspect_dependencies(cls)
         if init_method:
+            self._check_lifecycle_method(cls, init_method, "init_method")
             self._init_hooks[cls] = init_method
         if destroy_method:
+            self._check_lifecycle_method(cls, destroy_method, "destroy_method")
             self._destroy_hooks[cls] = destroy_method
 
     def register_instance(
@@ -293,6 +295,13 @@ class Container:
         child._init_hooks = dict(self._init_hooks)
         child._destroy_hooks = dict(self._destroy_hooks)
         return child
+
+    @staticmethod
+    def _check_lifecycle_method(target: type, method_name: str, kind: str) -> None:
+        """Raise if the named method does not exist on the class."""
+        if not hasattr(target, method_name):
+            msg = f"{kind} '{method_name}' does not exist on {target.__name__}"
+            raise ValueError(msg)
 
     def _check_scope(self, scope: Scope) -> None:
         """Raise if the scope has no registered manager."""
