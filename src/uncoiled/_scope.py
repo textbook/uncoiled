@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+import contextlib
+import contextvars
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from ._types import Scope
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 @runtime_checkable
@@ -94,3 +99,53 @@ class TransientScope:
 
     def clear(self) -> None:
         """No-op (nothing to clear)."""
+
+
+class RequestScope:
+    """Scope that caches instances per request context via contextvars."""
+
+    def __init__(self) -> None:
+        self._var: contextvars.ContextVar[dict[tuple[type, str | None], object]] = (
+            contextvars.ContextVar("_uncoiled_request_scope")
+        )
+
+    @property
+    def scope(self) -> Scope:
+        """Return the scope type."""
+        return Scope.REQUEST
+
+    def get[T](self, key: type[T], qualifier: str | None = None) -> T | None:
+        """Return the cached instance for the current context, or None."""
+        instances = self._var.get(None)
+        if instances is None:
+            return None
+        return instances.get((key, qualifier))  # type: ignore[return-value]
+
+    def put[T](self, key: type[T], instance: T, qualifier: str | None = None) -> None:
+        """Cache the instance in the current request context."""
+        instances = self._var.get(None)
+        if instances is None:
+            msg = "No active request context"
+            raise LookupError(msg)
+        instances[(key, qualifier)] = instance
+
+    def remove(self, key: type, qualifier: str | None = None) -> None:
+        """Remove a cached instance from the current context."""
+        instances = self._var.get(None)
+        if instances is not None:
+            instances.pop((key, qualifier), None)
+
+    def clear(self) -> None:
+        """Clear all instances in the current context."""
+        instances = self._var.get(None)
+        if instances is not None:
+            instances.clear()
+
+    @contextlib.contextmanager
+    def context(self) -> Iterator[None]:
+        """Enter a new request context."""
+        token = self._var.set({})
+        try:
+            yield
+        finally:
+            self._var.reset(token)

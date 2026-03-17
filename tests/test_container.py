@@ -57,16 +57,6 @@ class TestContainerRegistration:
         with pytest.raises(DependencyResolutionError):
             c.validate()
 
-    def test_register_rejects_unsupported_scope(self) -> None:
-        c = Container()
-        with pytest.raises(ValueError, match="request"):
-            c.register(Repository, scope=Scope.REQUEST)
-
-    def test_register_factory_rejects_unsupported_scope(self) -> None:
-        c = Container()
-        with pytest.raises(ValueError, match="request"):
-            c.register_factory(Repository, return_type=Repository, scope=Scope.REQUEST)
-
     def test_register_rejects_invalid_init_method(self) -> None:
         c = Container()
         with pytest.raises(ValueError, match=r"init_method.*nonexistent.*Repository"):
@@ -525,6 +515,31 @@ class TestContainerFork:
         child.register(MockRepo, provides=Repository)
         assert isinstance(child.get(Repository), MockRepo)
         assert not isinstance(c.get(Repository), MockRepo)
+
+
+class TestRequestScope:
+    def test_same_instance_within_context(self) -> None:
+        c = Container()
+        c.register(Repository, scope=Scope.REQUEST)
+        with c.request_context():
+            first = c.get(Repository)
+            second = c.get(Repository)
+            assert first is second
+
+    def test_different_instances_across_contexts(self) -> None:
+        c = Container()
+        c.register(Repository, scope=Scope.REQUEST)
+        with c.request_context():
+            first = c.get(Repository)
+        with c.request_context():
+            second = c.get(Repository)
+        assert first is not second
+
+    def test_resolve_outside_context_raises(self) -> None:
+        c = Container()
+        c.register(Repository, scope=Scope.REQUEST)
+        with pytest.raises(LookupError, match="request context"):
+            c.get(Repository)
 
 
 class TestContainerScan:
