@@ -224,6 +224,38 @@ class TestInspectDependencies:
         assert specs[0].is_list is True
         assert specs[0].qualifier == "all"
 
+    def test_new_style_union_optional(self) -> None:
+        """T | None (types.UnionType) should unwrap to T."""
+
+        class Svc:
+            def __init__(self, repo: Repository | None) -> None:
+                self.repo = repo
+
+        specs = inspect_dependencies(Svc)
+        assert len(specs) == 1
+        assert specs[0].required_type is Repository
+        assert specs[0].optional is True
+
+    def test_old_and_new_union_in_same_class(self) -> None:
+        """Both typing.Optional and T | None should work in the same class."""
+
+        class Svc:
+            def __init__(
+                self,
+                old: Optional[Repository],  # noqa: UP045
+                new: UserService | None,
+            ) -> None:
+                self.old = old
+                self.new = new
+
+        specs = inspect_dependencies(Svc)
+        expected = 2
+        assert len(specs) == expected
+        assert specs[0].required_type is Repository
+        assert specs[0].optional is True
+        assert specs[1].required_type is UserService
+        assert specs[1].optional is True
+
     def test_function_inspection(self) -> None:
         def factory(repo: Repository, name: str = "x") -> UserService:
             _ = name
