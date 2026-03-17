@@ -3,6 +3,7 @@
 from importlib import metadata
 
 from ._component import ComponentMetadata, component
+from ._config._relaxed import normalise
 from ._container import Container
 from ._errors import DependencyResolutionError, FailureKind, ResolutionFailure
 from ._graph import ComponentNode, build_graph, validate_graph
@@ -36,6 +37,7 @@ __all__ = [
     "call_init",
     "component",
     "inspect_dependencies",
+    "normalise",
     "validate_graph",
 ]
 
