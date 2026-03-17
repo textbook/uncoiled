@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 from ._errors import DependencyResolutionError, FailureKind, ResolutionFailure
 from ._inspection import DependencySpec, inspect_dependencies
+from ._types import Scope
 
 
 @dataclass
@@ -17,6 +18,8 @@ class ComponentNode:
     provides: type
     qualifier: str | None = None
     dependencies: list[DependencySpec] = field(default_factory=list)
+    scope: Scope = Scope.SINGLETON
+    factory: object | None = None
 
 
 def _type_key(typ: type, qualifier: str | None = None) -> tuple[type, str | None]:

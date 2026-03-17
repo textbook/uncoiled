@@ -3,6 +3,7 @@
 from importlib import metadata
 
 from ._component import ComponentMetadata, component
+from ._container import Container
 from ._errors import DependencyResolutionError, FailureKind, ResolutionFailure
 from ._graph import ComponentNode, build_graph, validate_graph
 from ._inspection import DependencySpec, inspect_dependencies
@@ -16,6 +17,7 @@ __all__ = [
     "AsyncDisposable",
     "ComponentMetadata",
     "ComponentNode",
+    "Container",
     "DependencyResolutionError",
     "DependencySpec",
     "Disposable",
