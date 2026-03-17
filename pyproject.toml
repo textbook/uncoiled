@@ -9,6 +9,9 @@ authors = [
 requires-python = ">=3.12"
 dependencies = []
 
+[project.optional-dependencies]
+fastapi = ["fastapi>=0.100.0", "starlette>=0.27.0"]
+
 [build-system]
 requires = ["uv_build>=0.10.11,<0.11.0"]
 build-backend = "uv_build"
@@ -24,8 +27,11 @@ lint = [
     "ty>=0.0.23",
 ]
 test = [
+    "anyio[trio]>=4.0.0",
     "coverage>=7.13.5",
+    "httpx>=0.27.0",
     "pytest>=9.0.2",
+    "uncoiled[fastapi]",
 ]
 
 [project.entry-points.pytest11]
@@ -58,9 +64,14 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = [
     "D",
+    "PLR2004",
     "S101",
 ]
 "src/uncoiled/_pytest.py" = [
     "PT004",
     "PT005",
+]
+"src/uncoiled/fastapi.py" = [
+    "D100",
+    "TC001",
 ]
