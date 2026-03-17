@@ -35,6 +35,7 @@
   ],
   "postCreateCommand": "sudo chown -R vscode /home/vscode && uv sync && uv run pre-commit install",
   "remoteEnv": {
+    "UV_LINK_MODE": "copy",
     "UV_PROJECT_ENVIRONMENT": "/home/vscode/.virtualenvs/uncoiled"
   }
 }

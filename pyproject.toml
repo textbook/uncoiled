@@ -24,8 +24,21 @@ lint = [
     "ty>=0.0.23",
 ]
 test = [
+    "coverage>=7.13.5",
     "pytest>=9.0.2",
 ]
+
+[tool.coverage.run]
+omit = ["tests/**"]
+
+[tool.coverage.html]
+directory = "coverage/html/"
+
+[tool.coverage.lcov]
+output = "coverage/lcov.info"
+
+[tool.coverage.xml]
+output = "coverage/coverage.xml"
 
 [tool.ruff.lint]
 select = ["ALL"]
