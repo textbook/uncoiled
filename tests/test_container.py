@@ -627,3 +627,160 @@ class TestContainerScan:
         c = Container()
         c.scan(mod)
         assert isinstance(c.get(ScanService), ScanService)
+
+    def test_scan_walks_subpackages(self, tmp_path: pytest.TempPathFactory) -> None:
+        """scan() should discover components in submodules of a package."""
+        import sys  # noqa: PLC0415
+
+        # Create a real package on disk so pkgutil.walk_packages works
+        pkg_dir = tmp_path / "test_scan_pkg"  # type: ignore[operator]
+        pkg_dir.mkdir()
+        (pkg_dir / "__init__.py").write_text("")
+        (pkg_dir / "sub.py").write_text(
+            "from uncoiled import component\n\n"
+            "@component\n"
+            "class SubComponent:\n"
+            "    pass\n",
+        )
+
+        sys.path.insert(0, str(tmp_path))
+        try:
+            c = Container()
+            c.scan("test_scan_pkg")
+            # Import the class to use as a lookup key
+            from test_scan_pkg.sub import SubComponent  # type: ignore[import-not-found]  # noqa: PLC0415, I001
+
+            assert isinstance(c.get(SubComponent), SubComponent)
+        finally:
+            sys.path.remove(str(tmp_path))
+            sys.modules.pop("test_scan_pkg", None)
+            sys.modules.pop("test_scan_pkg.sub", None)
+
+
+class TestContainerLifecycleState:
+    def test_started_false_before_start(self) -> None:
+        c = Container()
+        c.register(Repository)
+        assert c._started is False  # noqa: SLF001
+
+    def test_started_true_after_start(self) -> None:
+        c = Container()
+        c.register(Repository)
+        c.start()
+        assert c._started is True  # noqa: SLF001
+
+    def test_started_false_after_close(self) -> None:
+        c = Container()
+        c.register(Repository)
+        c.start()
+        c.close()
+        assert c._started is False  # noqa: SLF001
+
+    @pytest.mark.anyio
+    async def test_started_true_after_astart(self) -> None:
+        c = Container()
+        c.register(Repository)
+        await c.astart()
+        assert c._started is True  # noqa: SLF001
+
+    @pytest.mark.anyio
+    async def test_started_false_after_aclose(self) -> None:
+        c = Container()
+        c.register(Repository)
+        await c.astart()
+        await c.aclose()
+        assert c._started is False  # noqa: SLF001
+
+    def test_start_calls_init_hooks_for_singletons(self) -> None:
+        class Service:
+            started = False
+
+            def initialize(self) -> None:
+                self.started = True
+
+        c = Container()
+        c.register(Service, init_method="initialize")
+        c.start()
+        assert c.get(Service).started
+
+    def test_close_clears_scope_caches(self) -> None:
+        c = Container()
+        c.register(Repository)
+        c.start()
+        repo = c.get(Repository)
+        assert repo is not None
+        c.close()
+        # After close, the singleton cache should be cleared
+        singleton = c._scopes[Scope.SINGLETON]  # noqa: SLF001
+        assert singleton.get(Repository) is None
+
+    @pytest.mark.anyio
+    async def test_aclose_clears_scope_caches(self) -> None:
+        c = Container()
+        c.register(Repository)
+        await c.astart()
+        c.get(Repository)
+        await c.aclose()
+        singleton = c._scopes[Scope.SINGLETON]  # noqa: SLF001
+        assert singleton.get(Repository) is None
+
+    @pytest.mark.anyio
+    async def test_astart_calls_init_hooks_for_singletons(self) -> None:
+        class Service:
+            started = False
+
+            async def initialize(self) -> None:
+                self.started = True
+
+        c = Container()
+        c.register(Service, init_method="initialize")
+        await c.astart()
+        assert c.get(Service).started
+
+
+class TestGetAllQualifierFiltering:
+    def test_get_all_with_qualifier_skips_non_matching(self) -> None:
+        class RepoA(Repository):
+            pass
+
+        class RepoB(Repository):
+            pass
+
+        class RepoC(Repository):
+            pass
+
+        c = Container()
+        c.register(RepoA, provides=Repository, qualifier="a")
+        c.register(RepoB, provides=Repository, qualifier="b")
+        c.register(RepoC, provides=Repository, qualifier="c")
+        results = c.get_all(Repository, qualifier="b")
+        assert len(results) == 1
+        assert isinstance(results[0], RepoB)
+
+    def test_get_all_without_qualifier_returns_all(self) -> None:
+        class RepoA(Repository):
+            pass
+
+        class RepoB(Repository):
+            pass
+
+        c = Container()
+        c.register(RepoA, provides=Repository, qualifier="a")
+        c.register(RepoB, provides=Repository, qualifier="b")
+        expected = 2
+        assert len(c.get_all(Repository)) == expected
+
+    def test_resolve_missing_with_qualifier_includes_qualifier_in_error(self) -> None:
+        c = Container()
+        with pytest.raises(LookupError, match="primary"):
+            c.get(Repository, qualifier="primary")
+
+    @pytest.mark.anyio
+    async def test_aresolve_caches_singleton(self) -> None:
+        """Async resolution should cache singletons, returning same instance."""
+        c = Container()
+        c.register(Repository)
+        await c.astart()
+        first = c.get(Repository)
+        second = c.get(Repository)
+        assert first is second
