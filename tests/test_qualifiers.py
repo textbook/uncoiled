@@ -1,6 +1,6 @@
 from typing import Annotated, get_type_hints
 
-from uncoiled._qualifiers import Qualifier
+from uncoiled import Qualifier
 
 
 class TestQualifier:
