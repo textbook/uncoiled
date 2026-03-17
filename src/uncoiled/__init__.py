@@ -3,6 +3,7 @@
 from importlib import metadata
 
 from ._errors import DependencyResolutionError, FailureKind, ResolutionFailure
+from ._graph import ComponentNode, build_graph, validate_graph
 from ._inspection import DependencySpec, inspect_dependencies
 from ._qualifiers import Qualifier
 from ._types import MISSING, AsyncDisposable, Disposable, Factory, Scope
@@ -10,6 +11,7 @@ from ._types import MISSING, AsyncDisposable, Disposable, Factory, Scope
 __all__ = [
     "MISSING",
     "AsyncDisposable",
+    "ComponentNode",
     "DependencyResolutionError",
     "DependencySpec",
     "Disposable",
@@ -18,7 +20,9 @@ __all__ = [
     "Qualifier",
     "ResolutionFailure",
     "Scope",
+    "build_graph",
     "inspect_dependencies",
+    "validate_graph",
 ]
 
 __version__ = metadata.version(__name__)
