@@ -36,6 +36,26 @@ class TestContainerRegistration:
         c.register_factory(Repository, return_type=Repository)
         assert isinstance(c.get(Repository), Repository)
 
+    def test_register_factory_resolves_dependencies(self) -> None:
+        def make_service(repo: Repository) -> UserService:
+            return UserService(repo)
+
+        c = Container()
+        c.register(Repository)
+        c.register_factory(make_service, return_type=UserService)
+        svc = c.get(UserService)
+        assert isinstance(svc, UserService)
+        assert isinstance(svc.repo, Repository)
+
+    def test_register_factory_validates_dependencies(self) -> None:
+        def make_service(repo: Repository) -> UserService:
+            return UserService(repo)
+
+        c = Container()
+        c.register_factory(make_service, return_type=UserService)
+        with pytest.raises(DependencyResolutionError):
+            c.validate()
+
     def test_register_rejects_unsupported_scope(self) -> None:
         c = Container()
         with pytest.raises(ValueError, match="request"):

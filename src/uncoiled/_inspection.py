@@ -33,18 +33,25 @@ def _is_optional_union(annotation: object) -> type | None:
     return None
 
 
-def inspect_dependencies(cls: type) -> list[DependencySpec]:
-    """Extract dependency specifications from a class's ``__init__`` parameters.
+def inspect_dependencies(target: object) -> list[DependencySpec]:
+    """Extract dependency specifications from a callable's parameters.
 
-    Inspects the ``__init__`` signature and type annotations to determine
-    what dependencies a class requires for construction.
+    For classes, inspects ``__init__``. For functions, inspects the
+    function signature directly.
     """
+    if isinstance(target, type):
+        func = target.__init__
+    elif callable(target):
+        func = target
+    else:
+        return []
+
     try:
-        hints = inspect.get_annotations(cls.__init__, eval_str=True)
+        hints = inspect.get_annotations(func, eval_str=True)
     except Exception:  # noqa: BLE001
         return []
 
-    sig = inspect.signature(cls.__init__)
+    sig = inspect.signature(func)
     specs: list[DependencySpec] = []
 
     for name, param in sig.parameters.items():
