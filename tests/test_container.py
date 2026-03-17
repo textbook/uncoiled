@@ -78,6 +78,28 @@ class TestContainerResolution:
         c.register(OptService)
         assert isinstance(c.get(OptService).repo, Repository)
 
+    def test_optional_with_default_preserves_default(self) -> None:
+        sentinel = object()
+
+        class OptService:
+            def __init__(self, repo: Repository | None = sentinel) -> None:  # type: ignore[assignment]
+                self.repo = repo
+
+        c = Container()
+        c.register(OptService)
+        assert c.get(OptService).repo is sentinel
+
+    def test_non_optional_with_default_preserves_default(self) -> None:
+        default_repo = Repository()
+
+        class OptService:
+            def __init__(self, repo: Repository = default_repo) -> None:
+                self.repo = repo
+
+        c = Container()
+        c.register(OptService)
+        assert c.get(OptService).repo is default_repo
+
     def test_list_dependency(self) -> None:
         class RepoA(Repository):
             pass
