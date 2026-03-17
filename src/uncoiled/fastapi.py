@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends, Request
 
-from ._container import Container
+from ._container import Container  # noqa: TC001 — used at runtime in Depends()
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
