@@ -123,7 +123,7 @@ class TestRequestScope:
         def run_in_context(value: str) -> None:
             with scope.context():
                 scope.put(str, value)
-                results.append(scope.get(str))  # type: ignore[arg-type]
+                results.append(scope.get(str))  # ty: ignore[invalid-argument-type]
 
         ctx1 = contextvars.copy_context()
         ctx2 = contextvars.copy_context()

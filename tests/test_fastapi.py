@@ -51,7 +51,7 @@ class TestRequestScopeMiddleware:
         c = Container()
         c.register(Repository, scope=Scope.REQUEST)
         app = FastAPI()
-        app.add_middleware(RequestScopeMiddleware, container=c)  # type: ignore[arg-type]
+        app.add_middleware(RequestScopeMiddleware, container=c)  # ty: ignore[invalid-argument-type]
         configure_container(app, c)
 
         @app.get("/")
@@ -73,7 +73,7 @@ class TestRequestScopeMiddleware:
         c = Container()
         c.register(Repository, scope=Scope.REQUEST)
         app = FastAPI()
-        app.add_middleware(RequestScopeMiddleware, container=c)  # type: ignore[arg-type]
+        app.add_middleware(RequestScopeMiddleware, container=c)  # ty: ignore[invalid-argument-type]
         configure_container(app, c)
 
         ids: list[int] = []

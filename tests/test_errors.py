@@ -32,7 +32,7 @@ class TestResolutionFailure:
             suggestion="fix",
         )
         try:
-            failure.message = "changed"  # type: ignore[misc]
+            failure.message = "changed"  # ty: ignore[invalid-assignment]
         except AttributeError:
             pass
         else:
