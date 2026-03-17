@@ -205,6 +205,18 @@ class TestContainerResolution:
         assert len(svc.repos) == 1
         assert isinstance(svc.repos[0], RepoA)
 
+    def test_get_all_finds_subclass_registered_as_itself(self) -> None:
+        """get_all should find subclasses even when registered as their own type."""
+
+        class SpecialRepo(Repository):
+            pass
+
+        c = Container()
+        c.register(SpecialRepo)  # registered as SpecialRepo, not provides=Repository
+        results = c.get_all(Repository)
+        assert len(results) == 1
+        assert isinstance(results[0], SpecialRepo)
+
 
 class TestContainerValidation:
     def test_validate_raises_on_missing(self) -> None:
