@@ -100,3 +100,26 @@ class TestUncoiledLifespan:
         c = Container()
         lifespan = uncoiled_lifespan(c)
         assert callable(lifespan)
+
+    @pytest.mark.anyio
+    async def test_lifespan_starts_and_closes_container(self) -> None:
+        class Resource:
+            closed = False
+
+            def close(self) -> None:
+                self.closed = True
+
+        c = Container()
+        c.register(Resource)
+        app = FastAPI()
+        lifespan = uncoiled_lifespan(c)
+
+        async with lifespan(app):
+            # Container should be started and attached to app state
+            assert hasattr(app.state, "uncoiled_container")
+            assert app.state.uncoiled_container is c
+            res = c.get(Resource)
+            assert res is not None
+
+        # After exiting, lifespan closes the container
+        assert res.closed
