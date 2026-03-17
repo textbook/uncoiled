@@ -1,17 +1,19 @@
 [project]
 name = "uncoiled"
 version = "0.1.0"
-description = "Add your description here"
+description = "Dependency injection for modern Python"
 readme = "README.md"
 authors = [
     { name = "Jonathan Sharpe", email = "mail@jonrshar.pe" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = []
-
-[project.scripts]
-uncoiled = "uncoiled:main"
 
 [build-system]
 requires = ["uv_build>=0.10.11,<0.11.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
