@@ -1,4 +1,4 @@
-from uncoiled._errors import (
+from uncoiled import (
     DependencyResolutionError,
     FailureKind,
     ResolutionFailure,
