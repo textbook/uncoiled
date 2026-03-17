@@ -101,6 +101,21 @@ class TestRequestScope:
             scope.put(str, "hello")
         assert scope.get(str) is None
 
+    def test_remove_outside_context_is_noop(self) -> None:
+        scope = RequestScope()
+        scope.remove(str)  # should not raise
+
+    def test_remove_within_context(self) -> None:
+        scope = RequestScope()
+        with scope.context():
+            scope.put(str, "hello")
+            scope.remove(str)
+            assert scope.get(str) is None
+
+    def test_scope_is_property(self) -> None:
+        scope = RequestScope()
+        assert isinstance(type(scope).scope, property)
+
     def test_context_isolation(self) -> None:
         scope = RequestScope()
         results: list[str] = []
