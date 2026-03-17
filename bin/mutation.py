@@ -71,7 +71,7 @@ def baseline(config: ConfigDict, /) -> None:
         db.clear()
         db.add_work_item(
             WorkItem(
-                mutations=(),
+                mutations=[],  # ty: ignore[invalid-argument-type] -- library definition is wrong
                 job_id="baseline",
             ),
         )
