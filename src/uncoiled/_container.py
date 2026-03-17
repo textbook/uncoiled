@@ -223,7 +223,7 @@ class Container:
                     dep.required_type,
                     dep.qualifier,
                 )
-            elif dep.optional:
+            elif dep.optional and not dep.has_default:
                 kwargs[dep.name] = None
         else:
             kwargs[dep.name] = self._resolve(dep.required_type, dep.qualifier)
