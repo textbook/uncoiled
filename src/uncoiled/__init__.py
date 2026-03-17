@@ -7,6 +7,7 @@ from ._errors import DependencyResolutionError, FailureKind, ResolutionFailure
 from ._graph import ComponentNode, build_graph, validate_graph
 from ._inspection import DependencySpec, inspect_dependencies
 from ._qualifiers import Qualifier
+from ._scope import ScopeManager, SingletonScope, TransientScope
 from ._types import MISSING, AsyncDisposable, Disposable, Factory, Scope
 
 __all__ = [
@@ -22,6 +23,9 @@ __all__ = [
     "Qualifier",
     "ResolutionFailure",
     "Scope",
+    "ScopeManager",
+    "SingletonScope",
+    "TransientScope",
     "build_graph",
     "component",
     "inspect_dependencies",
