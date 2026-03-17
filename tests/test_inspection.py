@@ -1,5 +1,7 @@
 from typing import Annotated, Optional, Union
 
+import pytest
+
 from uncoiled import DependencySpec, Qualifier, inspect_dependencies
 
 
@@ -255,6 +257,26 @@ class TestInspectDependencies:
         assert specs[0].optional is True
         assert specs[1].required_type is UserService
         assert specs[1].optional is True
+
+    def test_dependency_spec_is_frozen(self) -> None:
+        spec = DependencySpec(name="x", required_type=Repository)
+        with pytest.raises(AttributeError):
+            spec.name = "y"  # type: ignore[misc]
+
+    def test_annotated_with_non_qualifier_metadata_ignored(self) -> None:
+        """Non-Qualifier metadata in Annotated should be skipped."""
+
+        class Svc:
+            def __init__(
+                self,
+                repo: Annotated[Repository, "some_string", Qualifier("pg")],
+            ) -> None:
+                self.repo = repo
+
+        specs = inspect_dependencies(Svc)
+        assert len(specs) == 1
+        assert specs[0].qualifier == "pg"
+        assert specs[0].required_type is Repository
 
     def test_function_inspection(self) -> None:
         def factory(repo: Repository, name: str = "x") -> UserService:
