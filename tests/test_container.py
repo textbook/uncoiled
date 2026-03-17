@@ -36,6 +36,16 @@ class TestContainerRegistration:
         c.register_factory(Repository, return_type=Repository)
         assert isinstance(c.get(Repository), Repository)
 
+    def test_register_rejects_unsupported_scope(self) -> None:
+        c = Container()
+        with pytest.raises(ValueError, match="request"):
+            c.register(Repository, scope=Scope.REQUEST)
+
+    def test_register_factory_rejects_unsupported_scope(self) -> None:
+        c = Container()
+        with pytest.raises(ValueError, match="request"):
+            c.register_factory(Repository, return_type=Repository, scope=Scope.REQUEST)
+
 
 class TestContainerResolution:
     def test_singleton_scope(self) -> None:
