@@ -40,7 +40,7 @@ def _coerce(value: str, target_type: type) -> object:
 
     coercer = _COERCIONS.get(target_type)
     if coercer is not None:
-        return coercer(value)  # type: ignore[operator]
+        return coercer(value)  # ty: ignore[call-non-callable]
 
     return value
 
@@ -70,7 +70,7 @@ class _ConfigPropertiesDecorator:
 
     def __call__(self, cls: type) -> type:
         """Attach prefix metadata to the class."""
-        cls.__config_prefix__ = self._prefix  # type: ignore[attr-defined]
+        cls.__config_prefix__ = self._prefix  # ty: ignore[unresolved-attribute]
         return cls
 
 

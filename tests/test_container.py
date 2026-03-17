@@ -113,7 +113,7 @@ class TestContainerResolution:
         sentinel = object()
 
         class OptService:
-            def __init__(self, repo: Repository | None = sentinel) -> None:  # type: ignore[assignment]
+            def __init__(self, repo: Repository | None = sentinel) -> None:  # ty: ignore[invalid-parameter-default]
                 self.repo = repo
 
         c = Container()
@@ -634,7 +634,7 @@ class TestContainerScan:
             pass
 
         mod = types.ModuleType("test_scan_mod")
-        mod.ScanService = ScanService  # type: ignore[attr-defined]
+        mod.ScanService = ScanService  # ty: ignore[unresolved-attribute]
 
         c = Container()
         c.scan(mod)
@@ -645,7 +645,7 @@ class TestContainerScan:
         import sys  # noqa: PLC0415
 
         # Create a real package on disk so pkgutil.walk_packages works
-        pkg_dir = tmp_path / "test_scan_pkg"  # type: ignore[operator]
+        pkg_dir = tmp_path / "test_scan_pkg"  # ty: ignore[unsupported-operator]
         pkg_dir.mkdir()
         (pkg_dir / "__init__.py").write_text("")
         (pkg_dir / "sub.py").write_text(
@@ -660,7 +660,7 @@ class TestContainerScan:
             c = Container()
             c.scan("test_scan_pkg")
             # Import the class to use as a lookup key
-            from test_scan_pkg.sub import SubComponent  # type: ignore[import-not-found]  # noqa: PLC0415, I001
+            from test_scan_pkg.sub import SubComponent  # ty: ignore[unresolved-import]  # noqa: PLC0415, I001
 
             assert isinstance(c.get(SubComponent), SubComponent)
         finally:

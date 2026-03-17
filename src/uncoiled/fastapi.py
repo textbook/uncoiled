@@ -15,9 +15,7 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends, Request
 
-from ._container import Container
-from ._scope import RequestScope
-from ._types import Scope as UncoiledScope
+from ._container import Container  # noqa: TC001 — used at runtime in Depends()
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
@@ -61,10 +59,7 @@ class RequestScopeMiddleware:
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Wrap HTTP requests in a request scope context."""
         if scope["type"] in {"http", "websocket"}:
-            request_scope: RequestScope = self._container._scopes[  # noqa: SLF001
-                UncoiledScope.REQUEST
-            ]  # type: ignore[assignment]
-            with request_scope.context():
+            with self._container.request_context():
                 await self._app(scope, receive, send)
         else:
             await self._app(scope, receive, send)
@@ -81,7 +76,7 @@ def uncoiled_lifespan(
 
     @contextlib.asynccontextmanager
     async def _lifespan(app: object) -> AsyncIterator[None]:
-        app.state.uncoiled_container = container  # type: ignore[union-attr]
+        app.state.uncoiled_container = container  # ty: ignore[unresolved-attribute]
         container.start()
         try:
             yield
@@ -96,5 +91,5 @@ def configure_container(app: object, container: Container) -> None:
 
     Convenience for test setups where the ASGI lifespan is not triggered.
     """
-    app.state.uncoiled_container = container  # type: ignore[union-attr]
+    app.state.uncoiled_container = container  # ty: ignore[unresolved-attribute]
     container.start()

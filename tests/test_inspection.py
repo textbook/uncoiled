@@ -261,7 +261,7 @@ class TestInspectDependencies:
     def test_dependency_spec_is_frozen(self) -> None:
         spec = DependencySpec(name="x", required_type=Repository)
         with pytest.raises(AttributeError):
-            spec.name = "y"  # type: ignore[misc]
+            spec.name = "y"  # ty: ignore[invalid-assignment]
 
     def test_annotated_with_non_qualifier_metadata_ignored(self) -> None:
         """Non-Qualifier metadata in Annotated should be skipped."""

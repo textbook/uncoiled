@@ -2,7 +2,7 @@ from uncoiled import ComponentMetadata, Scope, component
 
 
 def _get_metadata(cls: type) -> ComponentMetadata:
-    return cls.__uncoiled__  # type: ignore[attr-defined]
+    return cls.__uncoiled__  # ty: ignore[unresolved-attribute]
 
 
 class TestComponentDecorator:
@@ -57,7 +57,7 @@ class TestComponentDecorator:
     def test_metadata_is_frozen(self) -> None:
         meta = ComponentMetadata()
         try:
-            meta.scope = Scope.TRANSIENT  # type: ignore[misc]
+            meta.scope = Scope.TRANSIENT  # ty: ignore[invalid-assignment]
         except AttributeError:
             pass
         else:

@@ -24,7 +24,7 @@ class DbConfig:
 class AppConfig:
     name: str = "myapp"
     debug: bool = False
-    tags: list[str] = ""  # type: ignore[assignment]
+    tags: list[str] = ""  # ty: ignore[invalid-assignment]
 
 
 class TestConfigProperties:

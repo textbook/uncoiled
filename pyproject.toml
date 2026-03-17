@@ -73,11 +73,3 @@ ignore = [
     "PLR2004",
     "S101",
 ]
-"src/uncoiled/_pytest.py" = [
-    "PT004",
-    "PT005",
-]
-"src/uncoiled/fastapi.py" = [
-    "D100",
-    "TC001",
-]

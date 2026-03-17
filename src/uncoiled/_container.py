@@ -119,9 +119,8 @@ class Container:
     def scan(self, *modules: str | ModuleType) -> None:
         """Scan modules for ``@component``-decorated classes and register them."""
         for module in modules:
-            if isinstance(module, str):
-                module = importlib.import_module(module)  # noqa: PLW2901
-            self._scan_module(module)
+            mod = importlib.import_module(module) if isinstance(module, str) else module
+            self._scan_module(mod)
 
     def _scan_module(self, mod: ModuleType) -> None:
         """Scan a single module and its submodules for components."""
@@ -217,7 +216,7 @@ class Container:
             if reg_type is type_ or (
                 isinstance(reg_type, type) and issubclass(reg_type, type_)
             ):
-                results.append(self._resolve(node.provides, qual))  # type: ignore[arg-type]
+                results.append(self._resolve(node.provides, qual))  # ty: ignore[invalid-argument-type]
         return results
 
     def _resolve[T](self, type_: type[T], qualifier: str | None = None) -> T:
@@ -245,7 +244,7 @@ class Container:
             self._instances.append(instance)
         call_init(instance, self._init_hooks.get(node.impl))
 
-        return instance  # type: ignore[return-value]
+        return instance  # ty: ignore[invalid-return-type]
 
     async def _aresolve[T](self, type_: type[T], qualifier: str | None = None) -> T:
         """Resolve a type from the container (async)."""
@@ -272,7 +271,7 @@ class Container:
             self._instances.append(instance)
         await async_call_init(instance, self._init_hooks.get(node.impl))
 
-        return instance  # type: ignore[return-value]
+        return instance  # ty: ignore[invalid-return-type]
 
     def _create_instance(self, node: ComponentNode) -> object:
         """Create an instance from a ComponentNode."""
@@ -281,7 +280,7 @@ class Container:
             self._resolve_dependency(dep, kwargs)
 
         if node.factory is not None:
-            return node.factory(**kwargs)  # type: ignore[operator]
+            return node.factory(**kwargs)  # ty: ignore[call-non-callable]
 
         return node.impl(**kwargs)
 
@@ -350,7 +349,7 @@ class Container:
     def request_context(self) -> contextlib.AbstractContextManager[None]:
         """Enter a new request scope context."""
         scope = self._scopes[Scope.REQUEST]
-        return scope.context()  # type: ignore[union-attr]
+        return scope.context()  # ty: ignore[unresolved-attribute]
 
     def fork(self) -> Container:
         """Create a child container with shared registrations."""

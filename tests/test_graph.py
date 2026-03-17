@@ -143,7 +143,7 @@ class TestBuildGraph:
             def __init__(
                 self,
                 opt: Repository | None = None,
-                required: UserService = ...,  # type: ignore[assignment]
+                required: UserService = ...,  # ty: ignore[invalid-parameter-default]
             ) -> None:
                 self.opt = opt
                 self.required = required

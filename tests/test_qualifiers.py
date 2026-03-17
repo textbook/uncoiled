@@ -15,7 +15,7 @@ class TestQualifier:
     def test_frozen(self) -> None:
         q = Qualifier("x")
         try:
-            q.name = "y"  # type: ignore[misc]
+            q.name = "y"  # ty: ignore[invalid-assignment]
         except AttributeError:
             pass
         else:
