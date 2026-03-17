@@ -1,7 +1,14 @@
 import os
 import pathlib
 
-from uncoiled import ConfigSource, DictSource, DotEnvSource, EnvSource, LayeredSource
+from uncoiled import (
+    ConfigSource,
+    DictSource,
+    DotEnvSource,
+    EnvSource,
+    LayeredSource,
+    YamlSource,
+)
 
 
 class TestDictSource:
@@ -94,3 +101,34 @@ class TestLayeredSource:
 
     def test_conforms_to_protocol(self) -> None:
         assert isinstance(LayeredSource(), ConfigSource)
+
+
+class TestYamlSource:
+    def test_flat_keys(self, tmp_path: pathlib.Path) -> None:
+        p = tmp_path / "config.yml"
+        p.write_text("db_host: localhost\ndb_port: 5432\n")
+        source = YamlSource(str(p))
+        assert source.get("db.host") == "localhost"
+        assert source.get("db.port") == "5432"
+
+    def test_nested_keys(self, tmp_path: pathlib.Path) -> None:
+        p = tmp_path / "config.yml"
+        p.write_text("db:\n  host: localhost\n  port: 5432\n")
+        source = YamlSource(str(p))
+        assert source.get("db.host") == "localhost"
+        assert source.get("db.port") == "5432"
+
+    def test_missing_file(self) -> None:
+        source = YamlSource("/nonexistent/config.yml")
+        assert source.get("anything") is None
+
+    def test_conforms_to_protocol(self, tmp_path: pathlib.Path) -> None:
+        p = tmp_path / "config.yml"
+        p.write_text("")
+        assert isinstance(YamlSource(str(p)), ConfigSource)
+
+    def test_normalises_keys(self, tmp_path: pathlib.Path) -> None:
+        p = tmp_path / "config.yml"
+        p.write_text("DB_HOST: localhost\n")
+        source = YamlSource(str(p))
+        assert source.get("db.host") == "localhost"

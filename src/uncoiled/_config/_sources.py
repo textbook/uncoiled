@@ -72,6 +72,44 @@ class DotEnvSource:
         return self._data.get(normalise(key))
 
 
+class YamlSource:
+    """Configuration source backed by a YAML file (requires ``pyyaml``)."""
+
+    def __init__(self, path: str) -> None:
+        self._data: dict[str, str] = {}
+        self._load(path)
+
+    def _load(self, path: str) -> None:
+        """Parse a YAML file and flatten into dotted keys."""
+        try:
+            import yaml  # noqa: PLC0415
+        except ModuleNotFoundError:
+            msg = "pyyaml is required for YamlSource — install uncoiled[yaml]"
+            raise ImportError(msg) from None
+
+        try:
+            with open(path) as f:  # noqa: PTH123
+                raw = yaml.safe_load(f)
+        except FileNotFoundError:
+            return
+
+        if isinstance(raw, dict):
+            self._flatten(raw, "")
+
+    def _flatten(self, obj: dict[str, object], prefix: str) -> None:
+        """Recursively flatten nested dicts into dotted-key strings."""
+        for key, value in obj.items():
+            full_key = f"{prefix}{key}" if not prefix else f"{prefix}.{key}"
+            if isinstance(value, dict):
+                self._flatten(value, full_key)  # type: ignore[arg-type]
+            else:
+                self._data[normalise(full_key)] = str(value)
+
+    def get(self, key: str) -> str | None:
+        """Return the value for the normalised key."""
+        return self._data.get(normalise(key))
+
+
 class LayeredSource:
     """Combine multiple sources with priority (first match wins)."""
 
