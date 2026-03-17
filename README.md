@@ -16,6 +16,6 @@ When a task is finished, run:
 - `uv run ty check` to check the types
 - `uv run ruff check` to run the linting
 - `uv run ruff format --check` to check the formatting
-- `uv run pytest` to run the tests
+- `uv run coverage run --module pytest` to run the tests
 
   [uv]: https://docs.astral.sh/uv/
