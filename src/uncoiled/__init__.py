@@ -4,6 +4,13 @@ from importlib import metadata
 
 from ._component import ComponentMetadata, component
 from ._config._relaxed import normalise
+from ._config._sources import (
+    ConfigSource,
+    DictSource,
+    DotEnvSource,
+    EnvSource,
+    LayeredSource,
+)
 from ._container import Container
 from ._errors import DependencyResolutionError, FailureKind, ResolutionFailure
 from ._graph import ComponentNode, build_graph, validate_graph
@@ -18,12 +25,17 @@ __all__ = [
     "AsyncDisposable",
     "ComponentMetadata",
     "ComponentNode",
+    "ConfigSource",
     "Container",
     "DependencyResolutionError",
     "DependencySpec",
+    "DictSource",
     "Disposable",
+    "DotEnvSource",
+    "EnvSource",
     "Factory",
     "FailureKind",
+    "LayeredSource",
     "Qualifier",
     "ResolutionFailure",
     "Scope",
