@@ -12,6 +12,7 @@ from ._config._sources import (
     DotEnvSource,
     EnvSource,
     LayeredSource,
+    YamlSource,
 )
 from ._container import Container
 from ._errors import DependencyResolutionError, FailureKind, ResolutionFailure
@@ -47,6 +48,7 @@ __all__ = [
     "ScopeManager",
     "SingletonScope",
     "TransientScope",
+    "YamlSource",
     "async_call_destroy",
     "async_call_init",
     "bind_config",
