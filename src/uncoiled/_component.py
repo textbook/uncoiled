@@ -51,7 +51,7 @@ def component(
     meta = ComponentMetadata(scope=scope, qualifier=qualifier)
 
     if cls is not None:
-        cls.__uncoiled__ = meta  # type: ignore[attr-defined]
+        cls.__uncoiled__ = meta  # ty: ignore[unresolved-attribute]
         return cls
 
     return _ComponentDecorator(meta)
@@ -64,5 +64,5 @@ class _ComponentDecorator:
         self._meta = meta
 
     def __call__(self, cls: type) -> type:
-        cls.__uncoiled__ = self._meta  # type: ignore[attr-defined]
+        cls.__uncoiled__ = self._meta  # ty: ignore[unresolved-attribute]
         return cls

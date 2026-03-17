@@ -51,7 +51,7 @@ class SingletonScope:
 
     def get[T](self, key: type[T], qualifier: str | None = None) -> T | None:
         """Return the cached instance or None."""
-        return self._instances.get((key, qualifier))  # type: ignore[return-value]
+        return self._instances.get((key, qualifier))  # ty: ignore[invalid-return-type]
 
     def put[T](self, key: type[T], instance: T, qualifier: str | None = None) -> None:
         """Cache the instance."""
@@ -119,7 +119,7 @@ class RequestScope:
         instances = self._var.get(None)
         if instances is None:
             return None
-        return instances.get((key, qualifier))  # type: ignore[return-value]
+        return instances.get((key, qualifier))  # ty: ignore[invalid-return-type]
 
     def put[T](self, key: type[T], instance: T, qualifier: str | None = None) -> None:
         """Cache the instance in the current request context."""

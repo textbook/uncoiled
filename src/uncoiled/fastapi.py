@@ -76,7 +76,7 @@ def uncoiled_lifespan(
 
     @contextlib.asynccontextmanager
     async def _lifespan(app: object) -> AsyncIterator[None]:
-        app.state.uncoiled_container = container  # type: ignore[union-attr]
+        app.state.uncoiled_container = container  # ty: ignore[unresolved-attribute]
         container.start()
         try:
             yield
@@ -91,5 +91,5 @@ def configure_container(app: object, container: Container) -> None:
 
     Convenience for test setups where the ASGI lifespan is not triggered.
     """
-    app.state.uncoiled_container = container  # type: ignore[union-attr]
+    app.state.uncoiled_container = container  # ty: ignore[unresolved-attribute]
     container.start()

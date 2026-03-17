@@ -104,7 +104,7 @@ class YamlSource:
         for key, value in obj.items():
             full_key = f"{prefix}{key}" if not prefix else f"{prefix}.{key}"
             if isinstance(value, dict):
-                self._flatten(value, full_key)  # type: ignore[arg-type]
+                self._flatten(value, full_key)  # ty: ignore[invalid-argument-type]
             else:
                 self._data[normalise(full_key)] = str(value)
 
