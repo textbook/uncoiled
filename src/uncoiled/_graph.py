@@ -47,7 +47,8 @@ def build_graph(
         in_degree.setdefault(key, 0)
 
     for key, node in registrations.items():
-        node.dependencies = inspect_dependencies(node.impl)
+        target = node.factory if node.factory is not None else node.impl
+        node.dependencies = inspect_dependencies(target)
         for dep in node.dependencies:
             dep_key = _type_key(dep.required_type, dep.qualifier)
 

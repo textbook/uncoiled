@@ -93,13 +93,15 @@ class Container:
         """Register a factory callable for a type."""
         self._check_scope(scope)
         key = (return_type, qualifier)
-        self._registrations[key] = ComponentNode(
+        node = ComponentNode(
             impl=return_type,
             provides=return_type,
             qualifier=qualifier,
             scope=scope,
             factory=factory,
         )
+        node.dependencies = inspect_dependencies(factory)
+        self._registrations[key] = node
 
     def scan(self, *modules: str | ModuleType) -> None:
         """Scan modules for ``@component``-decorated classes and register them."""
@@ -203,13 +205,13 @@ class Container:
 
     def _create_instance(self, node: ComponentNode) -> object:
         """Create an instance from a ComponentNode."""
-        if node.factory is not None:
-            return node.factory()  # type: ignore[operator]
-
-        deps = inspect_dependencies(node.impl)
         kwargs: dict[str, object] = {}
-        for dep in deps:
+        for dep in node.dependencies:
             self._resolve_dependency(dep, kwargs)
+
+        if node.factory is not None:
+            return node.factory(**kwargs)  # type: ignore[operator]
+
         return node.impl(**kwargs)
 
     def _resolve_dependency(
