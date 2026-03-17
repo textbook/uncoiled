@@ -223,6 +223,45 @@ class TestContainerLifecycle:
             repo = c.get(Repository)
             assert isinstance(repo, Repository)
 
+    def test_register_instance_destroy_method(self) -> None:
+        class Resource:
+            closed = False
+
+            def shutdown(self) -> None:
+                self.closed = True
+
+        res = Resource()
+        c = Container()
+        c.register_instance(res, destroy_method="shutdown")
+        c.close()
+        assert res.closed
+
+    def test_register_factory_init_method(self) -> None:
+        class Service:
+            started = False
+
+            def start(self) -> None:
+                self.started = True
+
+        c = Container()
+        c.register_factory(Service, return_type=Service, init_method="start")
+        svc = c.get(Service)
+        assert svc.started
+
+    def test_register_factory_destroy_method(self) -> None:
+        class Resource:
+            closed = False
+
+            def shutdown(self) -> None:
+                self.closed = True
+
+        c = Container()
+        c.register_factory(Resource, return_type=Resource, destroy_method="shutdown")
+        c.start()
+        res = c.get(Resource)
+        c.close()
+        assert res.closed
+
 
 class TestSingletonQualifierIsolation:
     def test_different_qualifiers_return_different_instances(self) -> None:
