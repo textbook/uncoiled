@@ -16,11 +16,11 @@ class ScopeManager(Protocol):
         """Return the scope this manager handles."""
         ...
 
-    def get[T](self, key: type[T]) -> T | None:
+    def get[T](self, key: type[T], qualifier: str | None = None) -> T | None:
         """Return a cached instance or None."""
         ...
 
-    def put[T](self, key: type[T], instance: T) -> None:
+    def put[T](self, key: type[T], instance: T, qualifier: str | None = None) -> None:
         """Store an instance in this scope."""
         ...
 
@@ -33,20 +33,20 @@ class SingletonScope:
     """Scope that caches a single instance per type for the container's lifetime."""
 
     def __init__(self) -> None:
-        self._instances: dict[type, object] = {}
+        self._instances: dict[tuple[type, str | None], object] = {}
 
     @property
     def scope(self) -> Scope:
         """Return the scope type."""
         return Scope.SINGLETON
 
-    def get[T](self, key: type[T]) -> T | None:
+    def get[T](self, key: type[T], qualifier: str | None = None) -> T | None:
         """Return the cached instance or None."""
-        return self._instances.get(key)  # type: ignore[return-value]
+        return self._instances.get((key, qualifier))  # type: ignore[return-value]
 
-    def put[T](self, key: type[T], instance: T) -> None:
+    def put[T](self, key: type[T], instance: T, qualifier: str | None = None) -> None:
         """Cache the instance."""
-        self._instances[key] = instance
+        self._instances[(key, qualifier)] = instance
 
     def clear(self) -> None:
         """Remove all cached instances."""
@@ -61,11 +61,20 @@ class TransientScope:
         """Return the scope type."""
         return Scope.TRANSIENT
 
-    def get[T](self, key: type[T]) -> T | None:  # noqa: ARG002
+    def get[T](
+        self,
+        key: type[T],  # noqa: ARG002
+        qualifier: str | None = None,  # noqa: ARG002
+    ) -> T | None:
         """Return None; transient instances are never cached."""
         return None
 
-    def put[T](self, key: type[T], instance: T) -> None:
+    def put[T](
+        self,
+        key: type[T],
+        instance: T,
+        qualifier: str | None = None,
+    ) -> None:
         """Do nothing; transient instances are not cached."""
 
     def clear(self) -> None:
