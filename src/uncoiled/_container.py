@@ -48,6 +48,7 @@ class Container:
         destroy_method: str | None = None,
     ) -> None:
         """Register a class as a component."""
+        self._check_scope(scope)
         provides = provides or cls
         key = (provides, qualifier)
         self._registrations[key] = ComponentNode(
@@ -88,6 +89,7 @@ class Container:
         qualifier: str | None = None,
     ) -> None:
         """Register a factory callable for a type."""
+        self._check_scope(scope)
         key = (return_type, qualifier)
         self._registrations[key] = ComponentNode(
             impl=return_type,
@@ -227,6 +229,12 @@ class Container:
                 kwargs[dep.name] = None
         else:
             kwargs[dep.name] = self._resolve(dep.required_type, dep.qualifier)
+
+    def _check_scope(self, scope: Scope) -> None:
+        """Raise if the scope has no registered manager."""
+        if scope not in self._scopes:
+            msg = f"No scope manager registered for {scope.value!r}"
+            raise ValueError(msg)
 
     def __enter__(self) -> Self:
         """Start the container as a context manager."""
