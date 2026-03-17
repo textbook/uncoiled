@@ -784,3 +784,36 @@ class TestGetAllQualifierFiltering:
         first = c.get(Repository)
         second = c.get(Repository)
         assert first is second
+
+    @pytest.mark.anyio
+    async def test_aresolve_missing_with_qualifier_includes_qualifier(self) -> None:
+        c = Container()
+        with pytest.raises(LookupError, match="primary"):
+            await c._aresolve(Repository, "primary")  # noqa: SLF001
+
+    @pytest.mark.anyio
+    async def test_astart_instantiates_qualified_singletons(self) -> None:
+        class RepoA(Repository):
+            pass
+
+        class RepoB(Repository):
+            pass
+
+        c = Container()
+        c.register(RepoA, provides=Repository, qualifier="a")
+        c.register(RepoB, provides=Repository, qualifier="b")
+        await c.astart()
+        a = c.get(Repository, qualifier="a")
+        b = c.get(Repository, qualifier="b")
+        assert isinstance(a, RepoA)
+        assert isinstance(b, RepoB)
+
+    @pytest.mark.anyio
+    async def test_aresolve_singleton_returns_same_instance(self) -> None:
+        """Calling _aresolve twice should return the cached singleton."""
+        c = Container()
+        c.register(Repository)
+        c.validate()
+        first = await c._aresolve(Repository)  # noqa: SLF001
+        second = await c._aresolve(Repository)  # noqa: SLF001
+        assert first is second
