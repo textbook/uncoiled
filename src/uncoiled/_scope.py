@@ -24,6 +24,10 @@ class ScopeManager(Protocol):
         """Store an instance in this scope."""
         ...
 
+    def remove(self, key: type, qualifier: str | None = None) -> None:
+        """Remove a single cached instance."""
+        ...
+
     def clear(self) -> None:
         """Remove all instances from this scope."""
         ...
@@ -47,6 +51,10 @@ class SingletonScope:
     def put[T](self, key: type[T], instance: T, qualifier: str | None = None) -> None:
         """Cache the instance."""
         self._instances[(key, qualifier)] = instance
+
+    def remove(self, key: type, qualifier: str | None = None) -> None:
+        """Remove a cached instance."""
+        self._instances.pop((key, qualifier), None)
 
     def clear(self) -> None:
         """Remove all cached instances."""
@@ -76,6 +84,13 @@ class TransientScope:
         qualifier: str | None = None,
     ) -> None:
         """Do nothing; transient instances are not cached."""
+
+    def remove(
+        self,
+        key: type,
+        qualifier: str | None = None,
+    ) -> None:
+        """No-op (nothing to remove)."""
 
     def clear(self) -> None:
         """No-op (nothing to clear)."""

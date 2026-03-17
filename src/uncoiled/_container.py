@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import importlib
 import inspect
 import pkgutil
@@ -14,6 +15,7 @@ from ._scope import SingletonScope, TransientScope
 from ._types import Scope
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from types import ModuleType
 
     from ._component import ComponentMetadata
@@ -229,6 +231,56 @@ class Container:
                 kwargs[dep.name] = None
         else:
             kwargs[dep.name] = self._resolve(dep.required_type, dep.qualifier)
+
+    @contextlib.contextmanager
+    def override(
+        self,
+        type_: type,
+        replacement: object,
+        *,
+        qualifier: str | None = None,
+    ) -> Iterator[None]:
+        """Temporarily replace a registration.
+
+        *replacement* may be a class (re-registered) or an instance.
+        """
+        key = (type_, qualifier)
+        old_node = self._registrations.get(key)
+        singleton = self._scopes[Scope.SINGLETON]
+        old_cached = singleton.get(type_, qualifier)
+
+        # Remove existing cache entry so the override takes effect
+        singleton.remove(type_, qualifier)
+
+        # Install the replacement
+        if isinstance(replacement, type):
+            self.register(replacement, provides=type_, qualifier=qualifier)
+        else:
+            self.register_instance(replacement, type_=type_, qualifier=qualifier)
+
+        try:
+            yield
+        finally:
+            # Remove the override's cache entry
+            singleton.remove(type_, qualifier)
+
+            # Restore original registration (or remove if there was none)
+            if old_node is None:
+                self._registrations.pop(key, None)
+            else:
+                self._registrations[key] = old_node
+
+            # Restore original cached instance
+            if old_cached is not None:
+                singleton.put(type_, old_cached, qualifier)
+
+    def fork(self) -> Container:
+        """Create a child container with shared registrations."""
+        child = Container()
+        child._registrations = dict(self._registrations)
+        child._init_hooks = dict(self._init_hooks)
+        child._destroy_hooks = dict(self._destroy_hooks)
+        return child
 
     def _check_scope(self, scope: Scope) -> None:
         """Raise if the scope has no registered manager."""
