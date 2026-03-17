@@ -77,7 +77,7 @@ class Container:
             provides=type_,
             qualifier=qualifier,
         )
-        self._scopes[Scope.SINGLETON].put(type_, instance)
+        self._scopes[Scope.SINGLETON].put(type_, instance, qualifier)
 
     def register_factory(
         self,
@@ -106,10 +106,7 @@ class Container:
 
     def _scan_module(self, mod: ModuleType) -> None:
         """Scan a single module and its submodules for components."""
-        for _name, obj in inspect.getmembers(mod, inspect.isclass):
-            meta: ComponentMetadata | None = getattr(obj, "__uncoiled__", None)
-            if meta is not None:
-                self.register(obj, scope=meta.scope, qualifier=meta.qualifier)
+        self._register_from_module(mod)
 
         if hasattr(mod, "__path__"):
             for _importer, modname, _ispkg in pkgutil.walk_packages(
@@ -117,7 +114,14 @@ class Container:
                 prefix=mod.__name__ + ".",
             ):
                 submod = importlib.import_module(modname)
-                self._scan_module(submod)
+                self._register_from_module(submod)
+
+    def _register_from_module(self, mod: ModuleType) -> None:
+        """Register all ``@component``-decorated classes found in a module."""
+        for _name, obj in inspect.getmembers(mod, inspect.isclass):
+            meta: ComponentMetadata | None = getattr(obj, "__uncoiled__", None)
+            if meta is not None:
+                self.register(obj, scope=meta.scope, qualifier=meta.qualifier)
 
     def validate(self) -> None:
         """Validate the dependency graph eagerly."""
@@ -128,19 +132,29 @@ class Container:
         self.validate()
         singleton = self._scopes[Scope.SINGLETON]
         for key, node in self._registrations.items():
-            if node.scope is Scope.SINGLETON and singleton.get(node.provides) is None:
+            if (
+                node.scope is Scope.SINGLETON
+                and singleton.get(node.provides, key[1]) is None
+            ):
                 self._resolve(node.provides, key[1])
         self._started = True
 
     def close(self) -> None:
         """Destroy instances in reverse creation order."""
+        errors: list[Exception] = []
         for instance in reversed(self._instances):
-            destroy_method = self._destroy_hooks.get(type(instance))
-            call_destroy(instance, destroy_method)
+            try:
+                destroy_method = self._destroy_hooks.get(type(instance))
+                call_destroy(instance, destroy_method)
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
         self._instances.clear()
         for scope_manager in self._scopes.values():
             scope_manager.clear()
         self._started = False
+        if errors:
+            msg = "errors during container close"
+            raise ExceptionGroup(msg, errors)
 
     def get[T](self, type_: type[T], qualifier: str | None = None) -> T:
         """Resolve a single instance of the given type."""
@@ -168,16 +182,17 @@ class Container:
 
         scope_manager = self._scopes.get(node.scope)
         if scope_manager:
-            cached = scope_manager.get(type_)
+            cached = scope_manager.get(type_, qualifier)
             if cached is not None:
                 return cached
 
         instance = self._create_instance(node)
 
         if scope_manager:
-            scope_manager.put(type_, instance)
+            scope_manager.put(type_, instance, qualifier)
 
-        self._instances.append(instance)
+        if node.scope is not Scope.TRANSIENT or node.impl in self._destroy_hooks:
+            self._instances.append(instance)
         call_init(instance, self._init_hooks.get(node.impl))
 
         return instance  # type: ignore[return-value]

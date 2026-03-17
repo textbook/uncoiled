@@ -29,6 +29,13 @@ class TestSingletonScope:
     def test_conforms_to_protocol(self) -> None:
         assert isinstance(SingletonScope(), ScopeManager)
 
+    def test_qualifier_isolation(self) -> None:
+        scope = SingletonScope()
+        scope.put(str, "default")
+        scope.put(str, "primary", qualifier="primary")
+        assert scope.get(str) == "default"
+        assert scope.get(str, qualifier="primary") == "primary"
+
 
 class TestTransientScope:
     def test_scope_type(self) -> None:

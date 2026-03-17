@@ -172,6 +172,98 @@ class TestContainerLifecycle:
             assert isinstance(repo, Repository)
 
 
+class TestSingletonQualifierIsolation:
+    def test_different_qualifiers_return_different_instances(self) -> None:
+        class RepoA(Repository):
+            pass
+
+        class RepoB(Repository):
+            pass
+
+        c = Container()
+        c.register(RepoA, provides=Repository, qualifier="a")
+        c.register(RepoB, provides=Repository, qualifier="b")
+
+        a = c.get(Repository, qualifier="a")
+        b = c.get(Repository, qualifier="b")
+        assert isinstance(a, RepoA)
+        assert isinstance(b, RepoB)
+
+    def test_register_instance_with_qualifier(self) -> None:
+        repo_a = Repository()
+        repo_b = Repository()
+        c = Container()
+        c.register_instance(repo_a, qualifier="a")
+        c.register_instance(repo_b, qualifier="b")
+        assert c.get(Repository, qualifier="a") is repo_a
+        assert c.get(Repository, qualifier="b") is repo_b
+
+
+class TestCloseErrorHandling:
+    def test_close_continues_on_destroy_error(self) -> None:
+        class FailResource:
+            def close(self) -> None:
+                msg = "fail"
+                raise RuntimeError(msg)
+
+        class GoodResource:
+            closed = False
+
+            def close(self) -> None:
+                self.closed = True
+
+        c = Container()
+        c.register(GoodResource, destroy_method="close")
+        c.register(FailResource, destroy_method="close")
+        c.start()
+        good = c.get(GoodResource)
+        with pytest.raises(ExceptionGroup):
+            c.close()
+        assert good.closed
+
+    def test_close_aggregates_multiple_errors(self) -> None:
+        class FailA:
+            def close(self) -> None:
+                msg = "a"
+                raise RuntimeError(msg)
+
+        class FailB:
+            def close(self) -> None:
+                msg = "b"
+                raise RuntimeError(msg)
+
+        c = Container()
+        c.register(FailA, destroy_method="close")
+        c.register(FailB, destroy_method="close")
+        c.start()
+        expected_count = 2
+        with pytest.raises(ExceptionGroup) as exc_info:
+            c.close()
+        assert len(exc_info.value.exceptions) == expected_count
+
+
+class TestTransientMemoryLeak:
+    def test_transient_without_destroy_not_tracked(self) -> None:
+        c = Container()
+        c.register(Repository, scope=Scope.TRANSIENT)
+        resolve_count = 10
+        for _ in range(resolve_count):
+            c.get(Repository)
+        assert len(c._instances) == 0  # noqa: SLF001
+
+    def test_transient_with_destroy_hook_tracked(self) -> None:
+        class Resource:
+            def close(self) -> None:
+                pass
+
+        c = Container()
+        c.register(Resource, scope=Scope.TRANSIENT, destroy_method="close")
+        resolve_count = 3
+        for _ in range(resolve_count):
+            c.get(Resource)
+        assert len(c._instances) == resolve_count  # noqa: SLF001
+
+
 class TestContainerScan:
     def test_scan_finds_decorated_classes(self) -> None:
         @component
