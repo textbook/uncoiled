@@ -1,8 +1,9 @@
 import types
+from typing import Annotated
 
 import pytest
 
-from uncoiled import Container, DependencyResolutionError, Scope, component
+from uncoiled import Container, DependencyResolutionError, Qualifier, Scope, component
 
 
 class Repository:
@@ -167,6 +168,42 @@ class TestContainerResolution:
         results = c.get_all(Repository)
         expected_count = 2
         assert len(results) == expected_count
+
+    def test_get_all_with_qualifier(self) -> None:
+        class RepoA(Repository):
+            pass
+
+        class RepoB(Repository):
+            pass
+
+        c = Container()
+        c.register(RepoA, provides=Repository, qualifier="a")
+        c.register(RepoB, provides=Repository, qualifier="b")
+        results = c.get_all(Repository, qualifier="a")
+        assert len(results) == 1
+        assert isinstance(results[0], RepoA)
+
+    def test_list_dependency_with_qualifier(self) -> None:
+        class RepoA(Repository):
+            pass
+
+        class RepoB(Repository):
+            pass
+
+        class FilteredService:
+            def __init__(
+                self,
+                repos: Annotated[list[Repository], Qualifier("a")],
+            ) -> None:
+                self.repos = repos
+
+        c = Container()
+        c.register(RepoA, provides=Repository, qualifier="a")
+        c.register(RepoB, provides=Repository, qualifier="b")
+        c.register(FilteredService)
+        svc = c.get(FilteredService)
+        assert len(svc.repos) == 1
+        assert isinstance(svc.repos[0], RepoA)
 
 
 class TestContainerValidation:

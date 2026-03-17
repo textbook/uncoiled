@@ -176,10 +176,12 @@ class Container:
         """Resolve a single instance of the given type."""
         return self._resolve(type_, qualifier)
 
-    def get_all[T](self, type_: type[T]) -> list[T]:
+    def get_all[T](self, type_: type[T], qualifier: str | None = None) -> list[T]:
         """Resolve all registered implementations of the given type."""
         results: list[T] = []
         for (reg_type, qual), node in self._registrations.items():
+            if qualifier is not None and qual != qualifier:
+                continue
             if reg_type is type_ or (
                 isinstance(reg_type, type) and issubclass(reg_type, type_)
             ):
@@ -231,7 +233,7 @@ class Container:
     ) -> None:
         """Resolve a single dependency into kwargs."""
         if dep.is_list:
-            kwargs[dep.name] = self.get_all(dep.required_type)
+            kwargs[dep.name] = self.get_all(dep.required_type, dep.qualifier)
         elif dep.optional or dep.has_default:
             dep_key = (dep.required_type, dep.qualifier)
             if dep_key in self._registrations:
