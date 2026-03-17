@@ -27,6 +27,10 @@ lint = [
     "ruff>=0.15.6",
     "ty>=0.0.23",
 ]
+mutation = [
+    "cosmic-ray>=8.4.4",
+    "tqdm>=4.67.3",
+]
 test = [
     "anyio[trio]>=4.0.0",
     "coverage>=7.13.5",

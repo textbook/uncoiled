@@ -6,8 +6,9 @@ dist/
 wheels/
 *.egg-info
 
-# Coverage data
+# Testing data
 coverage/
+mutation/
 .coverage
 
 # Virtual environments
