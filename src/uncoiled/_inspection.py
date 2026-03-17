@@ -9,6 +9,8 @@ from typing import Annotated, Union, get_args, get_origin
 
 from ._qualifiers import Qualifier
 
+_OPTIONAL_UNION_ARGS = 2
+
 
 @dataclass(frozen=True)
 class DependencySpec:
@@ -28,7 +30,7 @@ def _is_optional_union(annotation: object) -> type | None:
     if origin is Union or origin is types.UnionType:
         args = get_args(annotation)
         non_none = [a for a in args if a is not type(None)]
-        if len(non_none) == 1 and len(args) == 2:  # noqa: PLR2004
+        if len(non_none) == 1 and len(args) == _OPTIONAL_UNION_ARGS:
             return non_none[0]
     return None
 

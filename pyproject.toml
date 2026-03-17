@@ -78,6 +78,5 @@ ignore = [
     "PT005",
 ]
 "src/uncoiled/fastapi.py" = [
-    "D100",
     "TC001",
 ]

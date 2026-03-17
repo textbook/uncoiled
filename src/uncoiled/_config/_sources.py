@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from ._relaxed import normalise
+
+_MIN_QUOTED_LEN = 2
 
 
 @runtime_checkable
@@ -49,16 +52,16 @@ class DotEnvSource:
     def _load(self, path: str) -> None:
         """Parse a .env file into the data dict."""
         try:
-            with open(path) as f:  # noqa: PTH123
-                for line in f:
-                    line = line.strip()  # noqa: PLW2901
-                    if not line or line.startswith("#") or "=" not in line:
+            with Path(path).open() as f:
+                for raw_line in f:
+                    stripped = raw_line.strip()
+                    if not stripped or stripped.startswith("#") or "=" not in stripped:
                         continue
-                    key, _, value = line.partition("=")
+                    key, _, value = stripped.partition("=")
                     key = key.strip()
                     value = value.strip()
                     if (
-                        len(value) >= 2  # noqa: PLR2004
+                        len(value) >= _MIN_QUOTED_LEN
                         and value[0] == value[-1]
                         and value[0] in ('"', "'")
                     ):
@@ -88,7 +91,7 @@ class YamlSource:
             raise ImportError(msg) from None
 
         try:
-            with open(path) as f:  # noqa: PTH123
+            with Path(path).open() as f:
                 raw = yaml.safe_load(f)
         except FileNotFoundError:
             return

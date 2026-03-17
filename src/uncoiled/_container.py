@@ -119,9 +119,8 @@ class Container:
     def scan(self, *modules: str | ModuleType) -> None:
         """Scan modules for ``@component``-decorated classes and register them."""
         for module in modules:
-            if isinstance(module, str):
-                module = importlib.import_module(module)  # noqa: PLW2901
-            self._scan_module(module)
+            mod = importlib.import_module(module) if isinstance(module, str) else module
+            self._scan_module(mod)
 
     def _scan_module(self, mod: ModuleType) -> None:
         """Scan a single module and its submodules for components."""
