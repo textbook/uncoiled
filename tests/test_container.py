@@ -296,6 +296,131 @@ class TestTransientMemoryLeak:
         assert len(c._instances) == resolve_count  # noqa: SLF001
 
 
+class TestContainerOverride:
+    def test_override_replaces_with_class(self) -> None:
+        class MockRepo(Repository):
+            pass
+
+        c = Container()
+        c.register(Repository)
+        c.start()
+        original = c.get(Repository)
+        with c.override(Repository, MockRepo):
+            assert isinstance(c.get(Repository), MockRepo)
+        assert c.get(Repository) is original
+
+    def test_override_replaces_with_instance(self) -> None:
+        mock = Repository()
+        c = Container()
+        c.register(Repository)
+        c.start()
+        with c.override(Repository, mock):
+            assert c.get(Repository) is mock
+
+    def test_override_restores_cached_singleton(self) -> None:
+        c = Container()
+        c.register(Repository)
+        c.start()
+        original = c.get(Repository)
+        with c.override(Repository, Repository):
+            pass
+        assert c.get(Repository) is original
+
+    def test_override_nonexistent_key(self) -> None:
+        c = Container()
+        with c.override(Repository, Repository):
+            assert isinstance(c.get(Repository), Repository)
+        with pytest.raises(LookupError):
+            c.get(Repository)
+
+    def test_override_with_qualifier(self) -> None:
+        class RepoA(Repository):
+            pass
+
+        class RepoB(Repository):
+            pass
+
+        class MockRepo(Repository):
+            pass
+
+        c = Container()
+        c.register(RepoA, provides=Repository, qualifier="a")
+        c.register(RepoB, provides=Repository, qualifier="b")
+        c.start()
+        with c.override(Repository, MockRepo, qualifier="a"):
+            assert isinstance(c.get(Repository, qualifier="a"), MockRepo)
+            assert isinstance(c.get(Repository, qualifier="b"), RepoB)
+
+    def test_nested_overrides(self) -> None:
+        class MockA(Repository):
+            pass
+
+        class MockB(Repository):
+            pass
+
+        c = Container()
+        c.register(Repository)
+        c.start()
+        original = c.get(Repository)
+        with c.override(Repository, MockA):
+            assert isinstance(c.get(Repository), MockA)
+            with c.override(Repository, MockB):
+                assert isinstance(c.get(Repository), MockB)
+            assert isinstance(c.get(Repository), MockA)
+        assert c.get(Repository) is original
+
+
+class TestContainerFork:
+    def test_fork_shares_registrations(self) -> None:
+        c = Container()
+        c.register(Repository)
+        child = c.fork()
+        assert isinstance(child.get(Repository), Repository)
+
+    def test_fork_independent_singleton_cache(self) -> None:
+        c = Container()
+        c.register(Repository)
+        c.start()
+        child = c.fork()
+        assert c.get(Repository) is not child.get(Repository)
+
+    def test_fork_does_not_affect_parent(self) -> None:
+        class Extra:
+            pass
+
+        c = Container()
+        c.register(Repository)
+        child = c.fork()
+        child.register(Extra)
+        assert isinstance(child.get(Extra), Extra)
+        with pytest.raises(LookupError):
+            c.get(Extra)
+
+    def test_fork_inherits_lifecycle_hooks(self) -> None:
+        class Service:
+            started = False
+
+            def start(self) -> None:
+                self.started = True
+
+        c = Container()
+        c.register(Service, init_method="start")
+        child = c.fork()
+        svc = child.get(Service)
+        assert svc.started
+
+    def test_fork_child_can_override_registration(self) -> None:
+        class MockRepo(Repository):
+            pass
+
+        c = Container()
+        c.register(Repository)
+        child = c.fork()
+        child.register(MockRepo, provides=Repository)
+        assert isinstance(child.get(Repository), MockRepo)
+        assert not isinstance(c.get(Repository), MockRepo)
+
+
 class TestContainerScan:
     def test_scan_finds_decorated_classes(self) -> None:
         @component
