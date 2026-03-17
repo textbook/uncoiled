@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Self
 
 from ._graph import ComponentNode, validate_graph
 from ._inspection import DependencySpec, inspect_dependencies
-from ._lifecycle import call_destroy, call_init
+from ._lifecycle import async_call_destroy, async_call_init, call_destroy, call_init
 from ._scope import RequestScope, SingletonScope, TransientScope
 from ._types import Scope
 
@@ -158,6 +158,18 @@ class Container:
                 self._resolve(node.provides, key[1])
         self._started = True
 
+    async def astart(self) -> None:
+        """Validate the graph and instantiate all singletons (async)."""
+        self.validate()
+        singleton = self._scopes[Scope.SINGLETON]
+        for key, node in self._registrations.items():
+            if (
+                node.scope is Scope.SINGLETON
+                and singleton.get(node.provides, key[1]) is None
+            ):
+                await self._aresolve(node.provides, key[1])
+        self._started = True
+
     def close(self) -> None:
         """Destroy instances in reverse creation order."""
         errors: list[Exception] = []
@@ -165,6 +177,23 @@ class Container:
             try:
                 destroy_method = self._destroy_hooks.get(type(instance))
                 call_destroy(instance, destroy_method)
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
+        self._instances.clear()
+        for scope_manager in self._scopes.values():
+            scope_manager.clear()
+        self._started = False
+        if errors:
+            msg = "errors during container close"
+            raise ExceptionGroup(msg, errors)
+
+    async def aclose(self) -> None:
+        """Destroy instances in reverse creation order (async)."""
+        errors: list[Exception] = []
+        for instance in reversed(self._instances):
+            try:
+                destroy_method = self._destroy_hooks.get(type(instance))
+                await async_call_destroy(instance, destroy_method)
             except Exception as exc:  # noqa: BLE001
                 errors.append(exc)
         self._instances.clear()
@@ -215,6 +244,33 @@ class Container:
         if node.scope is not Scope.TRANSIENT or node.impl in self._destroy_hooks:
             self._instances.append(instance)
         call_init(instance, self._init_hooks.get(node.impl))
+
+        return instance  # type: ignore[return-value]
+
+    async def _aresolve[T](self, type_: type[T], qualifier: str | None = None) -> T:
+        """Resolve a type from the container (async)."""
+        key = (type_, qualifier)
+        node = self._registrations.get(key)
+        if node is None:
+            msg = f"No component registered for type {type_.__name__}"
+            if qualifier:
+                msg += f" with qualifier '{qualifier}'"
+            raise LookupError(msg)
+
+        scope_manager = self._scopes.get(node.scope)
+        if scope_manager:
+            cached = scope_manager.get(type_, qualifier)
+            if cached is not None:
+                return cached
+
+        instance = self._create_instance(node)
+
+        if scope_manager:
+            scope_manager.put(type_, instance, qualifier)
+
+        if node.scope is not Scope.TRANSIENT or node.impl in self._destroy_hooks:
+            self._instances.append(instance)
+        await async_call_init(instance, self._init_hooks.get(node.impl))
 
         return instance  # type: ignore[return-value]
 
@@ -325,3 +381,12 @@ class Container:
     def __exit__(self, *_args: object) -> None:
         """Close the container."""
         self.close()
+
+    async def __aenter__(self) -> Self:
+        """Start the container as an async context manager."""
+        await self.astart()
+        return self
+
+    async def __aexit__(self, *_args: object) -> None:
+        """Close the container asynchronously."""
+        await self.aclose()

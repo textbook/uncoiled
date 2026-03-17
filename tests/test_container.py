@@ -260,6 +260,79 @@ class TestContainerLifecycle:
             repo = c.get(Repository)
             assert isinstance(repo, Repository)
 
+    @pytest.mark.anyio
+    async def test_async_context_manager(self) -> None:
+        c = Container()
+        c.register(Repository)
+        async with c:
+            repo = c.get(Repository)
+            assert isinstance(repo, Repository)
+
+    @pytest.mark.anyio
+    async def test_astart_calls_async_init(self) -> None:
+        class Service:
+            started = False
+
+            async def start(self) -> None:
+                self.started = True
+
+        c = Container()
+        c.register(Service, init_method="start")
+        await c.astart()
+        assert c.get(Service).started
+
+    @pytest.mark.anyio
+    async def test_aclose_calls_async_destroy(self) -> None:
+        class Resource:
+            closed = False
+
+            async def shutdown(self) -> None:
+                self.closed = True
+
+        c = Container()
+        c.register(Resource, destroy_method="shutdown")
+        await c.astart()
+        res = c.get(Resource)
+        await c.aclose()
+        assert res.closed
+
+    @pytest.mark.anyio
+    async def test_aclose_calls_async_disposable(self) -> None:
+        class Resource:
+            closed = False
+
+            async def aclose(self) -> None:
+                self.closed = True
+
+        c = Container()
+        c.register(Resource)
+        await c.astart()
+        res = c.get(Resource)
+        await c.aclose()
+        assert res.closed
+
+    @pytest.mark.anyio
+    async def test_aclose_continues_on_error(self) -> None:
+        class FailResource:
+            async def aclose(self) -> None:
+                msg = "fail"
+                raise RuntimeError(msg)
+
+        class GoodResource:
+            closed = False
+
+            async def aclose(self) -> None:
+                self.closed = True
+
+        c = Container()
+        c.register(GoodResource)
+        c.register(FailResource)
+        await c.astart()
+        good = c.get(GoodResource)
+        with pytest.raises(ExceptionGroup):
+            await c.aclose()
+        assert good.closed
+
     def test_register_instance_destroy_method(self) -> None:
         class Resource:
             closed = False
