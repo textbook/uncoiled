@@ -3,6 +3,7 @@
 from importlib import metadata
 
 from ._errors import DependencyResolutionError, FailureKind, ResolutionFailure
+from ._qualifiers import Qualifier
 from ._types import MISSING, AsyncDisposable, Disposable, Factory, Scope
 
 __all__ = [
@@ -12,6 +13,7 @@ __all__ = [
     "Disposable",
     "Factory",
     "FailureKind",
+    "Qualifier",
     "ResolutionFailure",
     "Scope",
 ]
