@@ -15,5 +15,29 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    {include-group = "lint"},
+    {include-group = "test"},
+    "pre-commit>=4.5.1",
+]
+lint = [
+    "ruff>=0.15.6",
+    "ty>=0.0.23",
+]
+test = [
     "pytest>=9.0.2",
+]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "COM812",
+    "D105",
+    "D203",
+    "D213",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "D",
+    "S101",
 ]

@@ -8,6 +8,7 @@ from uncoiled import __version__
 
 ROOT_DIR = (pathlib.Path(__file__).parent / "..").resolve()
 
+
 @pytest.fixture
 def pyproject_file() -> dict[str, Any]:
     with (ROOT_DIR / "pyproject.toml").open(mode="rb") as f:
