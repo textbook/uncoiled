@@ -71,6 +71,7 @@ class Container:
         *,
         type_: type | None = None,
         qualifier: str | None = None,
+        destroy_method: str | None = None,
     ) -> None:
         """Register a pre-constructed instance."""
         type_ = type_ or type(instance)
@@ -81,14 +82,19 @@ class Container:
             qualifier=qualifier,
         )
         self._scopes[Scope.SINGLETON].put(type_, instance, qualifier)
+        self._instances.append(instance)
+        if destroy_method:
+            self._destroy_hooks[type_] = destroy_method
 
-    def register_factory(
+    def register_factory(  # noqa: PLR0913
         self,
         factory: object,
         *,
         return_type: type,
         scope: Scope = Scope.SINGLETON,
         qualifier: str | None = None,
+        init_method: str | None = None,
+        destroy_method: str | None = None,
     ) -> None:
         """Register a factory callable for a type."""
         self._check_scope(scope)
@@ -102,6 +108,10 @@ class Container:
         )
         node.dependencies = inspect_dependencies(factory)
         self._registrations[key] = node
+        if init_method:
+            self._init_hooks[return_type] = init_method
+        if destroy_method:
+            self._destroy_hooks[return_type] = destroy_method
 
     def scan(self, *modules: str | ModuleType) -> None:
         """Scan modules for ``@component``-decorated classes and register them."""
