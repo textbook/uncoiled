@@ -3,6 +3,7 @@
 from importlib import metadata
 
 from ._component import ComponentMetadata, component
+from ._config._binding import bind_config, config_properties
 from ._config._profiles import get_active_profiles
 from ._config._relaxed import normalise
 from ._config._sources import (
@@ -45,10 +46,12 @@ __all__ = [
     "TransientScope",
     "async_call_destroy",
     "async_call_init",
+    "bind_config",
     "build_graph",
     "call_destroy",
     "call_init",
     "component",
+    "config_properties",
     "get_active_profiles",
     "inspect_dependencies",
     "normalise",
