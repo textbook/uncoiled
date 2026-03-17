@@ -1,6 +1,8 @@
 import os
 import pathlib
 
+import pytest
+
 from uncoiled import (
     ConfigSource,
     DictSource,
@@ -80,6 +82,48 @@ class TestDotEnvSource:
 
     def test_conforms_to_protocol(self) -> None:
         assert isinstance(DotEnvSource("/nonexistent"), ConfigSource)
+
+    def test_skip_lines_without_equals(self, tmp_path: pathlib.Path) -> None:
+        p = tmp_path / ".env"
+        p.write_text("NO_EQUALS_HERE\nDB_HOST=localhost\n")
+        source = DotEnvSource(str(p))
+        assert source.get("db.host") == "localhost"
+        assert source.get("no.equals.here") is None
+
+    def test_empty_value(self, tmp_path: pathlib.Path) -> None:
+        p = tmp_path / ".env"
+        p.write_text("EMPTY_VAL=\n")
+        source = DotEnvSource(str(p))
+        assert source.get("empty.val") == ""
+
+    def test_single_char_value_not_stripped(self, tmp_path: pathlib.Path) -> None:
+        p = tmp_path / ".env"
+        p.write_text("CHAR=x\n")
+        source = DotEnvSource(str(p))
+        assert source.get("char") == "x"
+
+    def test_mismatched_quotes_not_stripped(self, tmp_path: pathlib.Path) -> None:
+        p = tmp_path / ".env"
+        p.write_text("MIX=\"value'\n")
+        source = DotEnvSource(str(p))
+        assert source.get("mix") == "\"value'"
+
+    def test_unquoted_value_with_quotes_inside(self, tmp_path: pathlib.Path) -> None:
+        p = tmp_path / ".env"
+        p.write_text("MSG=it's fine\n")
+        source = DotEnvSource(str(p))
+        assert source.get("msg") == "it's fine"
+
+
+class TestYamlSourceImportError:
+    def test_raises_import_error_when_yaml_missing(self) -> None:
+        from unittest.mock import patch  # noqa: PLC0415
+
+        with (
+            patch.dict("sys.modules", {"yaml": None}),
+            pytest.raises(ImportError, match="pyyaml"),
+        ):
+            YamlSource("any.yml")
 
 
 class TestLayeredSource:
