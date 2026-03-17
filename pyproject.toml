@@ -28,6 +28,12 @@ test = [
     "pytest>=9.0.2",
 ]
 
+[project.entry-points.pytest11]
+uncoiled = "uncoiled._pytest"
+
+[tool.pytest.ini_options]
+addopts = ["-p", "pytester"]
+
 [tool.coverage.run]
 omit = ["tests/**"]
 
@@ -53,4 +59,8 @@ ignore = [
 "tests/**" = [
     "D",
     "S101",
+]
+"src/uncoiled/_pytest.py" = [
+    "PT004",
+    "PT005",
 ]
