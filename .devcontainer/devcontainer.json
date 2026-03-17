@@ -1,0 +1,40 @@
+{
+  "dockerFile": "Dockerfile",
+  "customizations": {
+    "jetbrains": {
+      "plugins": [
+        "com.anthropic.code.plugin"
+      ]
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {"moby": false},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "mounts": [
+    {
+      source: "uncoiled-cache",
+      target: "/home/vscode/.cache",
+      type: "volume"
+    },
+    {
+      source: "uncoiled-claude",
+      target: "/home/vscode/.claude",
+      type: "volume"
+    },
+    {
+      source: "uncoiled-config",
+      target: "/home/vscode/.config",
+      type: "volume"
+    },
+    {
+      source: "uncoiled-virtualenvs",
+      target: "/home/vscode/.virtualenvs",
+      type: "volume"
+    }
+  ],
+  "postCreateCommand": "sudo chown -R vscode /home/vscode && uv sync && uv run pre-commit install",
+  "remoteEnv": {
+    "UV_PROJECT_ENVIRONMENT": "/home/vscode/.virtualenvs/uncoiled"
+  }
+}
