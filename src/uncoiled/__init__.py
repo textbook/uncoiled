@@ -20,7 +20,7 @@ from ._inspection import DependencySpec, inspect_dependencies
 from ._lifecycle import async_call_destroy, async_call_init, call_destroy, call_init
 from ._pytest import Inject
 from ._qualifiers import Qualifier
-from ._scope import ScopeManager, SingletonScope, TransientScope
+from ._scope import RequestScope, ScopeManager, SingletonScope, TransientScope
 from ._types import MISSING, AsyncDisposable, Disposable, Factory, Scope
 
 __all__ = [
@@ -41,6 +41,7 @@ __all__ = [
     "Inject",
     "LayeredSource",
     "Qualifier",
+    "RequestScope",
     "ResolutionFailure",
     "Scope",
     "ScopeManager",

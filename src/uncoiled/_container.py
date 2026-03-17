@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Self
 from ._graph import ComponentNode, validate_graph
 from ._inspection import DependencySpec, inspect_dependencies
 from ._lifecycle import call_destroy, call_init
-from ._scope import SingletonScope, TransientScope
+from ._scope import RequestScope, SingletonScope, TransientScope
 from ._types import Scope
 
 if TYPE_CHECKING:
@@ -33,6 +33,7 @@ class Container:
         self._scopes: dict[Scope, ScopeManager] = {
             Scope.SINGLETON: SingletonScope(),
             Scope.TRANSIENT: TransientScope(),
+            Scope.REQUEST: RequestScope(),
         }
         self._instances: list[object] = []
         self._destroy_hooks: dict[type, str | None] = {}
@@ -289,6 +290,11 @@ class Container:
             # Restore original cached instance
             if old_cached is not None:
                 singleton.put(type_, old_cached, qualifier)
+
+    def request_context(self) -> contextlib.AbstractContextManager[None]:
+        """Enter a new request scope context."""
+        scope = self._scopes[Scope.REQUEST]
+        return scope.context()  # type: ignore[union-attr]
 
     def fork(self) -> Container:
         """Create a child container with shared registrations."""
