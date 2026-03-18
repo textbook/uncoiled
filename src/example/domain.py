@@ -6,6 +6,12 @@ from dataclasses import dataclass
 from typing import Protocol
 
 
+class TenantId(str):
+    """Identifies the current tenant — injected from the request."""
+
+    __slots__ = ()
+
+
 @dataclass(frozen=True)
 class User:
     """A user in the system."""

@@ -14,9 +14,14 @@ from example.controller import (  # noqa: TC001 — used in route annotations
     CreateUserRequest,
     UserController,
 )
-from example.domain import User  # noqa: TC001 — used in route annotations
+from example.domain import TenantId, User
 from uncoiled import Container, EnvSource, bind_config
-from uncoiled.fastapi import Inject, uncoiled_lifespan
+from uncoiled.fastapi import (
+    Inject,
+    RequestScopeMiddleware,
+    RequestValueProvider,
+    uncoiled_lifespan,
+)
 
 # ── Container setup ──────────────────────────────────────────────
 #
@@ -24,21 +29,34 @@ from uncoiled.fastapi import Inject, uncoiled_lifespan
 # 2. Register it as an instance so the container can inject it.
 # 3. scan() discovers @component classes:
 #      - SqliteUserRepository (provides=UserRepository, needs DbConfig)
-#      - UserController (needs UserRepository)
+#      - UserController (needs UserRepository + TenantId)
+# 4. RequestScopeMiddleware extracts TenantId from each request
+#    header and seeds it into the request scope. Components that
+#    depend on TenantId receive it via normal constructor injection.
 
 container = Container()
 container.register_instance(bind_config(DbConfig, EnvSource()))
 container.scan("example")
 
 app = FastAPI(lifespan=uncoiled_lifespan(container))
+app.add_middleware(
+    RequestScopeMiddleware,  # ty: ignore[invalid-argument-type]
+    container=container,
+    request_values=[
+        RequestValueProvider(
+            TenantId,
+            lambda r: TenantId(r.headers.get("x-tenant-id", "default")),
+        ),
+    ],
+)
 
 # ── Routes ───────────────────────────────────────────────────────
 
 
 @app.get("/users")
-def list_users(ctrl: Inject[UserController]) -> list[User]:
-    """Return all users."""
-    return ctrl.list_users()
+def list_users(ctrl: Inject[UserController]) -> dict:
+    """Return all users, scoped to the current tenant."""
+    return {"tenant": ctrl.tenant, "users": ctrl.list_users()}
 
 
 @app.get("/users/{user_id}")

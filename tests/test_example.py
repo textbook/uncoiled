@@ -11,13 +11,16 @@ from unittest.mock import Mock
 import pytest
 
 from example.controller import CreateUserRequest, UserController
-from example.domain import User, UserRepository
+from example.domain import TenantId, User, UserRepository
 
 
 class TestUserController:
     def setup_method(self) -> None:
         self.repo = Mock(spec_set=UserRepository)
-        self.ctrl = UserController(repo=self.repo)
+        self.ctrl = UserController(
+            repo=self.repo,
+            tenant=TenantId("test-tenant"),
+        )
 
     def test_get_user(self) -> None:
         alice = User(id=1, name="Alice", email="alice@example.com")
