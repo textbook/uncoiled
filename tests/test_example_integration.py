@@ -1,9 +1,9 @@
 """Integration tests for the example application.
 
-Builds a test ``FastAPI`` app that mirrors the production app's routes
-but uses an ``InMemoryUserRepository``.  A module-scoped container
-wires everything, including ``RequestValueProvider`` for the tenant
-header — exactly as the production app does.
+Uses ``create_app`` from the production module so the tests exercise
+the exact same routes and middleware as the real app — only the
+container registrations differ (``InMemoryUserRepository`` instead
+of ``SqliteUserRepository``).
 """
 
 from __future__ import annotations
@@ -12,20 +12,17 @@ from typing import TYPE_CHECKING, ClassVar
 
 import httpx
 import pytest
-from fastapi import FastAPI, HTTPException
 
-from example.controller import CreateUserRequest, UserController
+from example.app import REQUEST_VALUES, create_app
+from example.controller import UserController
 from example.domain import TenantId, User, UserRepository
 from uncoiled import Container, Inject
-from uncoiled.fastapi import Inject as WebInject
-from uncoiled.fastapi import (
-    RequestScopeMiddleware,
-    RequestValueProvider,
-    configure_container,
-)
+from uncoiled.fastapi import configure_container
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from fastapi import FastAPI
 
 
 class InMemoryUserRepository:
@@ -51,57 +48,24 @@ class InMemoryUserRepository:
         return saved
 
 
-_REQUEST_VALUES = [
-    RequestValueProvider(
-        TenantId,
-        lambda r: TenantId(r.headers.get("x-tenant-id", "test")),
-    ),
-]
-
-_test_app = FastAPI()
-
-
-def _build_routes(test_app: FastAPI) -> None:
-    @test_app.get("/users")
-    def list_users(ctrl: WebInject[UserController]) -> dict:
-        return {"tenant": ctrl.tenant, "users": ctrl.list_users()}
-
-    @test_app.get("/users/{user_id}")
-    def get_user(
-        user_id: int,
-        ctrl: WebInject[UserController],
-    ) -> User:
-        try:
-            return ctrl.get_user(user_id)
-        except LookupError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    @test_app.post("/users", status_code=201)
-    def create_user(
-        body: CreateUserRequest,
-        ctrl: WebInject[UserController],
-    ) -> User:
-        return ctrl.create_user(body)
-
-
-_build_routes(_test_app)
-
-
 @pytest.fixture(scope="module")
-def uncoiled_container() -> Iterator[Container]:
+def _test_app() -> FastAPI:
+    """Build the app once per module so the container fixture can wire it."""
     c = Container()
     c.scan("example")
     c.register(InMemoryUserRepository, provides=UserRepository)
-    _test_app.add_middleware(
-        RequestScopeMiddleware,  # ty: ignore[invalid-argument-type]
-        container=c,
-        request_values=_REQUEST_VALUES,
-    )
+    application = create_app(c)
     configure_container(
-        _test_app,
+        application,
         c,
-        request_values=_REQUEST_VALUES,
+        request_values=REQUEST_VALUES,
     )
+    return application
+
+
+@pytest.fixture(scope="module")
+def uncoiled_container(_test_app: FastAPI) -> Iterator[Container]:
+    c: Container = _test_app.state.uncoiled_container
     with c:
         yield c
 
@@ -137,13 +101,17 @@ class TestViaInject:
 
 
 class TestHTTPRoutes:
-    """Hit the test app routes via ASGI transport."""
+    """Hit the real app routes via ASGI transport."""
 
     _headers: ClassVar[dict[str, str]] = {"x-tenant-id": "acme"}
 
+    @pytest.fixture(autouse=True)
+    def _app(self, _test_app: FastAPI) -> None:
+        self._test_app = _test_app
+
     def _client(self) -> httpx.AsyncClient:
         return httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=_test_app),
+            transport=httpx.ASGITransport(app=self._test_app),
             base_url="http://test",
         )
 
