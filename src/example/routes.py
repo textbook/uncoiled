@@ -11,16 +11,16 @@ from example.controller import (  # noqa: TC001 — used in route annotations
 from example.domain import User  # noqa: TC001 — used in route annotations
 from uncoiled.fastapi import Inject  # noqa: TC001 — used at runtime by FastAPI
 
-user_router = APIRouter()
+user_router = APIRouter(prefix="/users")
 
 
-@user_router.get("/users")
+@user_router.get("")
 def list_users(ctrl: Inject[UserController]) -> dict:
     """Return all users, scoped to the current tenant."""
     return {"tenant": ctrl.tenant, "users": ctrl.list_users()}
 
 
-@user_router.get("/users/{user_id}")
+@user_router.get("/{user_id}")
 def get_user(user_id: int, ctrl: Inject[UserController]) -> User:
     """Return a single user by ID."""
     try:
@@ -29,7 +29,7 @@ def get_user(user_id: int, ctrl: Inject[UserController]) -> User:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@user_router.post("/users", status_code=201)
+@user_router.post("", status_code=201)
 def create_user(
     body: CreateUserRequest,
     ctrl: Inject[UserController],
