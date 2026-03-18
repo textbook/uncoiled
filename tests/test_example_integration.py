@@ -28,8 +28,8 @@ if TYPE_CHECKING:
 @pytest.fixture(scope="module")
 def uncoiled_container() -> Iterator[Container]:
     c = Container()
+    c.scan("example")
     c.register(InMemoryUserRepository, provides=UserRepository)
-    c.register(UserController)
     configure_container(app, c)
     c.start()
     yield c
