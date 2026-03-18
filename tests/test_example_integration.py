@@ -52,9 +52,8 @@ def uncoiled_container() -> Iterator[Container]:
     c.scan("example")
     c.register(InMemoryUserRepository, provides=UserRepository)
     configure_container(app, c)
-    c.start()
-    yield c
-    c.close()
+    with c:
+        yield c
 
 
 class TestViaInject:
