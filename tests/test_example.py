@@ -11,12 +11,12 @@ from unittest.mock import Mock
 import pytest
 
 from example.controller import CreateUserRequest, UserController
-from example.domain import User
+from example.domain import User, UserRepository
 
 
 class TestUserController:
     def setup_method(self) -> None:
-        self.repo = Mock()
+        self.repo = Mock(spec_set=UserRepository)
         self.ctrl = UserController(repo=self.repo)
 
     def test_get_user(self) -> None:
