@@ -29,16 +29,28 @@ def _get_container(request: Request) -> Container:
     return container
 
 
-class _InjectMarker:
-    """Marker for ``Annotated[T, Inject]`` in FastAPI route signatures."""
+class Inject:
+    """Shorthand for injecting a dependency from the container.
 
+    Usage in route signatures::
 
-Inject = _InjectMarker()
-"""Use as ``Annotated[MyService, Inject]`` in route parameters."""
+        @app.get("/users")
+        def list_users(ctrl: Inject[UserController]) -> list[User]: ...
+
+    ``Inject[T]`` expands to ``Annotated[T, Depends(...)]`` so FastAPI
+    resolves the type from the container automatically.
+    """
+
+    def __class_getitem__(cls, type_: type) -> type:
+        """Return ``Annotated[T, Depends(...)]`` for the given type."""
+        return Annotated[type_, inject_dependency(type_)]  # type: ignore[return-value]
 
 
 def inject_dependency[T](type_: type[T]) -> T:
-    """Create a FastAPI ``Depends`` that resolves *type_* from the container."""
+    """Create a FastAPI ``Depends`` that resolves *type_* from the container.
+
+    Prefer ``Inject[T]`` in route signatures for brevity.
+    """
 
     def _resolve(
         container: Annotated[Container, Depends(_get_container)],

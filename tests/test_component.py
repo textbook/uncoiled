@@ -39,6 +39,23 @@ class TestComponentDecorator:
         )
         assert _get_metadata(MyService) == expected
 
+    def test_decorator_with_provides(self) -> None:
+        class Base:
+            pass
+
+        @component(provides=Base)
+        class Impl(Base):
+            pass
+
+        assert _get_metadata(Impl).provides is Base
+
+    def test_provides_defaults_to_none(self) -> None:
+        @component
+        class MyService:
+            pass
+
+        assert _get_metadata(MyService).provides is None
+
     def test_does_not_modify_class(self) -> None:
         @component
         class MyService:
