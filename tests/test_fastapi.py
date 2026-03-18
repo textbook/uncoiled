@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from uncoiled import Container, Scope
 from uncoiled.fastapi import (
+    Inject,
     RequestScopeMiddleware,
     configure_container,
     inject_dependency,
@@ -34,6 +35,25 @@ class TestInjectDependency:
         def index(
             repo: Annotated[Repository, inject_dependency(Repository)],
         ) -> dict:
+            return {"type": type(repo).__name__}
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.get("/")
+
+        assert resp.status_code == 200
+        assert resp.json() == {"type": "Repository"}
+
+    @pytest.mark.anyio
+    async def test_inject_shorthand_resolves_from_container(self) -> None:
+        c = Container()
+        c.register(Repository)
+        app = FastAPI()
+        configure_container(app, c)
+
+        @app.get("/")
+        def index(repo: Inject[Repository]) -> dict:
             return {"type": type(repo).__name__}
 
         async with httpx.AsyncClient(

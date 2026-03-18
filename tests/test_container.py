@@ -654,6 +654,21 @@ class TestContainerScan:
         c.scan(mod)
         assert isinstance(c.get(ScanService), ScanService)
 
+    def test_scan_honours_provides(self) -> None:
+        class Base:
+            pass
+
+        @component(provides=Base)
+        class Impl(Base):
+            pass
+
+        mod = types.ModuleType("test_scan_provides")
+        mod.Impl = Impl  # ty: ignore[unresolved-attribute]
+
+        c = Container()
+        c.scan(mod)
+        assert isinstance(c.get(Base), Impl)
+
     def test_scan_walks_subpackages(self, tmp_path: pytest.TempPathFactory) -> None:
         """scan() should discover components in submodules of a package."""
         import sys  # noqa: PLC0415

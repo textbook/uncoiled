@@ -14,6 +14,7 @@ class ComponentMetadata:
 
     scope: Scope = Scope.SINGLETON
     qualifier: str | None = None
+    provides: type | None = None
 
 
 @overload
@@ -25,6 +26,7 @@ def component(
     *,
     scope: Scope = ...,
     qualifier: str | None = ...,
+    provides: type | None = ...,
 ) -> _ComponentDecorator: ...
 
 
@@ -34,6 +36,7 @@ def component(
     *,
     scope: Scope = Scope.SINGLETON,
     qualifier: str | None = None,
+    provides: type | None = None,
 ) -> type | _ComponentDecorator:
     """Mark a class as a DI-managed component.
 
@@ -45,10 +48,13 @@ def component(
         @component(scope=Scope.TRANSIENT, qualifier="special")
         class SpecialService: ...
 
+        @component(provides=Repository)
+        class PostgresRepository: ...
+
     Attaches ``ComponentMetadata`` as a ``__uncoiled__`` attribute.
     Does not modify class behaviour.
     """
-    meta = ComponentMetadata(scope=scope, qualifier=qualifier)
+    meta = ComponentMetadata(scope=scope, qualifier=qualifier, provides=provides)
 
     if cls is not None:
         cls.__uncoiled__ = meta  # ty: ignore[unresolved-attribute]

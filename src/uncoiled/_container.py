@@ -139,7 +139,12 @@ class Container:
         for _name, obj in inspect.getmembers(mod, inspect.isclass):
             meta: ComponentMetadata | None = getattr(obj, "__uncoiled__", None)
             if meta is not None:
-                self.register(obj, scope=meta.scope, qualifier=meta.qualifier)
+                self.register(
+                    obj,
+                    scope=meta.scope,
+                    qualifier=meta.qualifier,
+                    provides=meta.provides,
+                )
 
     def validate(self) -> None:
         """Validate the dependency graph eagerly."""
