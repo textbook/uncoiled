@@ -22,6 +22,9 @@ if TYPE_CHECKING:
     from ._scope import ScopeManager
 
 
+_REQUEST_VALUE_SENTINEL = object()
+
+
 class Container:
     """Central dependency injection container.
 
@@ -115,6 +118,45 @@ class Container:
             self._init_hooks[return_type] = init_method
         if destroy_method:
             self._destroy_hooks[return_type] = destroy_method
+
+    def register_request_value(
+        self,
+        type_: type,
+        *,
+        qualifier: str | None = None,
+    ) -> None:
+        """Declare that a type will be provided per-request.
+
+        This creates a registration entry so graph validation succeeds,
+        but the actual value must be seeded via ``provide_request_value``
+        inside each request context.
+        """
+        key = (type_, qualifier)
+        node = ComponentNode(
+            impl=type_,
+            provides=type_,
+            qualifier=qualifier,
+            scope=Scope.REQUEST,
+            factory=_REQUEST_VALUE_SENTINEL,
+        )
+        self._registrations[key] = node
+
+    def provide_request_value(
+        self,
+        type_: type,
+        value: object,
+        *,
+        qualifier: str | None = None,
+    ) -> None:
+        """Seed a value into the current request scope."""
+        key = (type_, qualifier)
+        node = self._registrations.get(key)
+        if node is None or node.factory is not _REQUEST_VALUE_SENTINEL:
+            msg = f"No request value registered for type {type_.__name__}"
+            if qualifier:
+                msg += f" with qualifier '{qualifier}'"
+            raise LookupError(msg)
+        self._scopes[Scope.REQUEST].put(type_, value, qualifier)
 
     def scan(self, *modules: str | ModuleType) -> None:
         """Scan modules for ``@component``-decorated classes and register them."""
@@ -280,6 +322,13 @@ class Container:
 
     def _create_instance(self, node: ComponentNode) -> object:
         """Create an instance from a ComponentNode."""
+        if node.factory is _REQUEST_VALUE_SENTINEL:
+            msg = (
+                f"Request value for {node.provides.__name__} was not provided "
+                f"in the current request context"
+            )
+            raise LookupError(msg)
+
         kwargs: dict[str, object] = {}
         for dep in node.dependencies:
             self._resolve_dependency(dep, kwargs)
