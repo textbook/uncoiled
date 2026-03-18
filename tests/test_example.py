@@ -1,11 +1,14 @@
 """Tests for the example application.
 
-Demonstrates two testing strategies:
+Demonstrates three testing strategies:
 1. Unit tests — construct the controller with an in-memory repo, no container
-2. Integration tests — swap SqliteUserRepository for InMemoryUserRepository
+2. Container tests — use the ``inject`` fixture and ``uncoiled_override`` marker
+3. Integration tests — full HTTP stack with in-memory repo via container override
 """
 
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import httpx
 import pytest
@@ -16,15 +19,11 @@ from example.controller import CreateUserRequest, UserController
 from example.domain import User, UserRepository
 from example.infra import SqliteUserRepository
 from uncoiled import Container, DictSource, bind_config
+from uncoiled import Inject as PytestInject
 from uncoiled.fastapi import Inject, configure_container, uncoiled_lifespan
 
-
-def _make_container() -> Container:
-    """Build a fresh container with the example app's registrations."""
-    c = Container()
-    c.register_instance(bind_config(DbConfig, DictSource({})))
-    c.scan("example")
-    return c
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class InMemoryUserRepository:
@@ -48,6 +47,26 @@ class InMemoryUserRepository:
         self._users[saved.id] = saved
         self._next_id += 1
         return saved
+
+
+# ── Pytest plugin fixtures ────────────────────────────────────────
+#
+# Override the session-scoped ``uncoiled_container`` fixture so the
+# ``inject`` fixture and ``uncoiled_override`` marker work with the
+# example app's registrations.
+
+
+@pytest.fixture(scope="session")
+def uncoiled_container() -> Iterator[Container]:
+    c = Container()
+    c.register_instance(bind_config(DbConfig, DictSource({})))
+    c.scan("example")
+    c.start()
+    yield c
+    c.close()
+
+
+# ── 1. Unit tests ────────────────────────────────────────────────
 
 
 class TestUserControllerUnit:
@@ -79,24 +98,26 @@ class TestUserControllerUnit:
         assert self.ctrl.get_user(user.id) == user
 
 
-class TestContainerWiring:
-    """Verify the container wires the right implementations."""
+# ── 2. Container tests (pytest plugin) ───────────────────────────
 
-    def test_scan_discovers_sqlite_repo(self) -> None:
-        c = _make_container()
-        c.start()
-        ctrl = c.get(UserController)
+
+class TestContainerWiring:
+    """Use the ``inject`` fixture to resolve types from the container."""
+
+    def test_scan_discovers_sqlite_repo(self, inject: PytestInject) -> None:
+        ctrl = inject[UserController]
         assert isinstance(ctrl.repo, SqliteUserRepository)
 
-    def test_swap_to_in_memory_for_tests(self) -> None:
-        """Register the test double directly — no database needed."""
-        c = Container()
-        c.register(InMemoryUserRepository, provides=UserRepository)
-        c.register(UserController)
-        c.start()
-        ctrl = c.get(UserController)
-        assert isinstance(ctrl.repo, InMemoryUserRepository)
-        assert ctrl.get_user(1).name == "Alice"
+    @pytest.mark.uncoiled_override(UserRepository, InMemoryUserRepository)
+    def test_override_swaps_repo(self, inject: PytestInject) -> None:
+        repo = inject[UserRepository]
+        assert isinstance(repo, InMemoryUserRepository)
+        user = repo.find_by_id(1)
+        assert user is not None
+        assert user.name == "Alice"
+
+
+# ── 3. Integration tests (HTTP) ──────────────────────────────────
 
 
 class TestFastAPIIntegration:
@@ -126,7 +147,10 @@ class TestFastAPIIntegration:
                 raise HTTPException(status_code=404, detail=str(exc)) from exc
 
         @self.app.post("/users", status_code=201)
-        def create_user(body: CreateUserRequest, ctrl: Inject[UserController]) -> User:
+        def create_user(
+            body: CreateUserRequest,
+            ctrl: Inject[UserController],
+        ) -> User:
             return ctrl.create_user(body)
 
         configure_container(self.app, self.container)
