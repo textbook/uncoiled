@@ -1,9 +1,8 @@
 """Tests for the example application.
 
-Demonstrates three testing strategies:
-1. Unit tests — construct the controller with an in-memory repo, no container
-2. Container tests — use the ``inject`` fixture and ``uncoiled_override`` marker
-3. Integration tests — full HTTP stack with in-memory repo via container override
+Demonstrates two testing strategies:
+1. Unit tests — construct the controller directly, no container
+2. Integration tests — real app and routes, test double via container override
 """
 
 from __future__ import annotations
@@ -12,15 +11,11 @@ from typing import TYPE_CHECKING
 
 import httpx
 import pytest
-from fastapi import FastAPI
 
-from example.config import DbConfig
+from example.app import app, container
 from example.controller import CreateUserRequest, UserController
 from example.domain import User, UserRepository
-from example.infra import SqliteUserRepository
-from uncoiled import Container, DictSource, bind_config
-from uncoiled import Inject as PytestInject
-from uncoiled.fastapi import Inject, configure_container, uncoiled_lifespan
+from uncoiled.fastapi import configure_container
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -51,19 +46,17 @@ class InMemoryUserRepository:
 
 # ── Pytest plugin fixtures ────────────────────────────────────────
 #
-# Override the session-scoped ``uncoiled_container`` fixture so the
-# ``inject`` fixture and ``uncoiled_override`` marker work with the
-# example app's registrations.
+# Override the default ``uncoiled_container`` to use the real app's
+# container.  This enables the ``inject`` fixture and the
+# ``uncoiled_override`` marker for tests that need them.
 
 
 @pytest.fixture(scope="session")
-def uncoiled_container() -> Iterator[Container]:
-    c = Container()
-    c.register_instance(bind_config(DbConfig, DictSource({})))
-    c.scan("example")
-    c.start()
-    yield c
-    c.close()
+def uncoiled_container() -> Iterator[None]:
+    configure_container(app, container)
+    container.start()
+    yield container
+    container.close()
 
 
 # ── 1. Unit tests ────────────────────────────────────────────────
@@ -98,66 +91,30 @@ class TestUserControllerUnit:
         assert self.ctrl.get_user(user.id) == user
 
 
-# ── 2. Container tests (pytest plugin) ───────────────────────────
-
-
-class TestContainerWiring:
-    """Use the ``inject`` fixture to resolve types from the container."""
-
-    def test_scan_discovers_sqlite_repo(self, inject: PytestInject) -> None:
-        ctrl = inject[UserController]
-        assert isinstance(ctrl.repo, SqliteUserRepository)
-
-    @pytest.mark.uncoiled_override(UserRepository, InMemoryUserRepository)
-    def test_override_swaps_repo(self, inject: PytestInject) -> None:
-        repo = inject[UserRepository]
-        assert isinstance(repo, InMemoryUserRepository)
-        user = repo.find_by_id(1)
-        assert user is not None
-        assert user.name == "Alice"
-
-
-# ── 3. Integration tests (HTTP) ──────────────────────────────────
+# ── 2. Integration tests (HTTP against the real app) ─────────────
 
 
 class TestFastAPIIntegration:
-    """Integration tests — in-memory repo, real HTTP stack."""
+    """Hit the real app's routes with an in-memory repo swapped in.
+
+    Uses ``uncoiled_override`` to replace both the repository and the
+    controller (whose singleton was already cached with the original
+    repo) so every test gets a fresh ``InMemoryUserRepository``.
+    """
 
     @pytest.fixture(autouse=True)
-    def _app(self) -> None:
-        """Build a fresh app + container with in-memory repo for each test."""
-        self.container = Container()
-        self.container.register_instance(bind_config(DbConfig, DictSource({})))
-        self.container.register(InMemoryUserRepository, provides=UserRepository)
-        self.container.register(UserController)
-        self.app = FastAPI(lifespan=uncoiled_lifespan(self.container))
-
-        # Re-declare routes on the fresh app
-        @self.app.get("/users")
-        def list_users(ctrl: Inject[UserController]) -> list[User]:
-            return ctrl.list_users()
-
-        @self.app.get("/users/{user_id}")
-        def get_user(user_id: int, ctrl: Inject[UserController]) -> User:
-            try:
-                return ctrl.get_user(user_id)
-            except LookupError as exc:
-                from fastapi import HTTPException  # noqa: PLC0415
-
-                raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-        @self.app.post("/users", status_code=201)
-        def create_user(
-            body: CreateUserRequest,
-            ctrl: Inject[UserController],
-        ) -> User:
-            return ctrl.create_user(body)
-
-        configure_container(self.app, self.container)
+    def _override(self) -> Iterator[None]:
+        repo = InMemoryUserRepository()
+        ctrl = UserController(repo=repo)
+        with (
+            container.override(UserRepository, repo),
+            container.override(UserController, ctrl),
+        ):
+            yield
 
     def _client(self) -> httpx.AsyncClient:
         return httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=self.app),
+            transport=httpx.ASGITransport(app=app),
             base_url="http://test",
         )
 
