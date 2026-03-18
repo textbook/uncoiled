@@ -83,8 +83,8 @@ class TestViaInject:
                 TenantId,
                 TenantId("test"),
             )
-            ctrl = inject[UserController]
-            assert isinstance(ctrl.repo, InMemoryUserRepository)
+            controller = inject[UserController]
+            assert isinstance(controller.repo, InMemoryUserRepository)
 
     def test_get_seeded_user(
         self,
@@ -96,8 +96,8 @@ class TestViaInject:
                 TenantId,
                 TenantId("test"),
             )
-            ctrl = inject[UserController]
-            assert ctrl.get_user(1).name == "Alice"
+            controller = inject[UserController]
+            assert controller.get_user(1).name == "Alice"
 
 
 class TestHTTPRoutes:

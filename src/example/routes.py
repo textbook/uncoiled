@@ -15,16 +15,16 @@ user_router = APIRouter(prefix="/users")
 
 
 @user_router.get("")
-def list_users(ctrl: Inject[UserController]) -> dict:
+def list_users(controller: Inject[UserController]) -> dict:
     """Return all users, scoped to the current tenant."""
-    return {"tenant": ctrl.tenant, "users": ctrl.list_users()}
+    return {"tenant": controller.tenant, "users": controller.list_users()}
 
 
 @user_router.get("/{user_id}")
-def get_user(user_id: int, ctrl: Inject[UserController]) -> User:
+def get_user(user_id: int, controller: Inject[UserController]) -> User:
     """Return a single user by ID."""
     try:
-        return ctrl.get_user(user_id)
+        return controller.get_user(user_id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -32,7 +32,7 @@ def get_user(user_id: int, ctrl: Inject[UserController]) -> User:
 @user_router.post("", status_code=201)
 def create_user(
     body: CreateUserRequest,
-    ctrl: Inject[UserController],
+    controller: Inject[UserController],
 ) -> User:
     """Create a new user."""
-    return ctrl.create_user(body)
+    return controller.create_user(body)
