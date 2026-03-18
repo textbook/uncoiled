@@ -1,4 +1,5 @@
 import types
+from dataclasses import dataclass
 from typing import Annotated
 
 import pytest
@@ -204,6 +205,19 @@ class TestContainerResolution:
         svc = c.get(FilteredService)
         assert len(svc.repos) == 1
         assert isinstance(svc.repos[0], RepoA)
+
+    def test_dataclass_injection(self) -> None:
+        """Dataclass fields are injected without a manual __init__."""
+
+        @dataclass
+        class Service:
+            repo: Repository
+
+        c = Container()
+        c.register(Repository)
+        c.register(Service)
+        svc = c.get(Service)
+        assert isinstance(svc.repo, Repository)
 
     def test_get_all_finds_subclass_registered_as_itself(self) -> None:
         """get_all should find subclasses even when registered as their own type."""
