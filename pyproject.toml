@@ -68,6 +68,10 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+"src/example/**" = [
+    "D102",
+    "D107",
+]
 "tests/**" = [
     "D",
     "PLR2004",
