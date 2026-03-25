@@ -93,10 +93,10 @@ class RequestScopeMiddleware:
             container.register_request_value(rv.type_, qualifier=rv.qualifier)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        """Wrap HTTP requests in a request scope context."""
+        """Wrap HTTP and WebSocket requests in a request scope context."""
         if scope["type"] in {"http", "websocket"}:
             with self._container.request_context():
-                if self._request_values:
+                if self._request_values and scope["type"] == "http":
                     request = Request(scope, receive, send)
                     for rv in self._request_values:
                         self._container.provide_request_value(

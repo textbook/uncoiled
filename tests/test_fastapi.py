@@ -3,7 +3,8 @@ from typing import Annotated
 import anyio
 import httpx
 import pytest
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, WebSocket
+from starlette.testclient import TestClient
 
 from uncoiled import Container, Scope
 from uncoiled.fastapi import (
@@ -246,6 +247,33 @@ class TestRequestValueProvider:
 
         tenants = {r.json()["tenant"] for r in results}
         assert tenants == {"acme", "globex"}
+
+    def test_websocket_not_crashed_by_request_values(self) -> None:
+        providers = [
+            RequestValueProvider(
+                _TenantId,
+                lambda r: _TenantId(r.headers["x-tenant-id"]),
+            ),
+        ]
+        c = Container()
+        app = FastAPI()
+        app.add_middleware(
+            RequestScopeMiddleware,  # ty: ignore[invalid-argument-type]
+            container=c,
+            request_values=providers,
+        )
+        configure_container(app, c, request_values=providers)
+
+        @app.websocket("/ws")
+        async def ws_endpoint(ws: WebSocket) -> None:
+            await ws.accept()
+            await ws.send_text("hello")
+            await ws.close()
+
+        with TestClient(app).websocket_connect("/ws") as ws:
+            data = ws.receive_text()
+
+        assert data == "hello"
 
 
 class TestUncoiledLifespan:
