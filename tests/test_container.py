@@ -520,6 +520,71 @@ class TestContainerLifecycle:
         c.close()
         assert res.closed
 
+    def test_qualified_init_methods_are_independent(self) -> None:
+        class ServiceA:
+            started = False
+
+            def boot(self) -> None:
+                self.started = True
+
+        class ServiceB:
+            started = False
+
+            def setup(self) -> None:
+                self.started = True
+
+        c = Container()
+        c.register(
+            ServiceA,
+            provides=Repository,
+            qualifier="a",
+            init_method="boot",
+        )
+        c.register(
+            ServiceB,
+            provides=Repository,
+            qualifier="b",
+            init_method="setup",
+        )
+        c.start()
+        a = c.get(Repository, qualifier="a")
+        b = c.get(Repository, qualifier="b")
+        assert a.started  # ty: ignore[unresolved-attribute]
+        assert b.started  # ty: ignore[unresolved-attribute]
+
+    def test_qualified_destroy_methods_are_independent(self) -> None:
+        class ResourceA:
+            closed = False
+
+            def teardown(self) -> None:
+                self.closed = True
+
+        class ResourceB:
+            closed = False
+
+            def cleanup(self) -> None:
+                self.closed = True
+
+        c = Container()
+        c.register(
+            ResourceA,
+            provides=Repository,
+            qualifier="a",
+            destroy_method="teardown",
+        )
+        c.register(
+            ResourceB,
+            provides=Repository,
+            qualifier="b",
+            destroy_method="cleanup",
+        )
+        c.start()
+        a = c.get(Repository, qualifier="a")
+        b = c.get(Repository, qualifier="b")
+        c.close()
+        assert a.closed  # ty: ignore[unresolved-attribute]
+        assert b.closed  # ty: ignore[unresolved-attribute]
+
 
 class TestSingletonQualifierIsolation:
     def test_different_qualifiers_return_different_instances(self) -> None:
