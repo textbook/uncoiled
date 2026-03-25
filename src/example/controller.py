@@ -6,6 +6,7 @@ The DI container wires in the real thing at runtime.
 
 from __future__ import annotations
 
+import logging  # noqa: TC003 — used at runtime in create_user
 from dataclasses import dataclass
 
 from example.domain import TenantId, User, UserRepository
@@ -33,6 +34,7 @@ class UserController:
 
     repo: UserRepository
     tenant: TenantId
+    logger: logging.Logger
 
     def get_user(self, user_id: int) -> User:
         """Retrieve a single user or raise."""
@@ -49,4 +51,6 @@ class UserController:
     def create_user(self, request: CreateUserRequest) -> User:
         """Create and return a new user."""
         user = User(id=0, name=request.name, email=request.email)
-        return self.repo.save(user)
+        saved = self.repo.save(user)
+        self.logger.info("Created user %s for tenant %s", saved.id, self.tenant)
+        return saved
