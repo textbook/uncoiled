@@ -1,13 +1,15 @@
 from typing import Annotated
 
+import anyio
 import httpx
 import pytest
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Request
 
 from uncoiled import Container, Scope
 from uncoiled.fastapi import (
     Inject,
     RequestScopeMiddleware,
+    RequestValueProvider,
     configure_container,
     inject_dependency,
     uncoiled_lifespan,
@@ -113,6 +115,137 @@ class TestRequestScopeMiddleware:
 
         assert len(ids) == 2
         assert ids[0] != ids[1]
+
+
+def _get_ctr(request: Request) -> Container:
+    return request.app.state.uncoiled_container
+
+
+class _TenantId(str):
+    __slots__ = ()
+
+
+class TestRequestValueProvider:
+    @pytest.mark.anyio
+    async def test_request_value_seeded_from_header(self) -> None:
+        class TenantRepo:
+            def __init__(self, tenant: _TenantId) -> None:
+                self.tenant = tenant
+
+        providers = [
+            RequestValueProvider(
+                _TenantId,
+                lambda r: _TenantId(r.headers["x-tenant-id"]),
+            ),
+        ]
+        c = Container()
+        c.register(TenantRepo, scope=Scope.REQUEST)
+        app = FastAPI()
+        app.add_middleware(
+            RequestScopeMiddleware,  # ty: ignore[invalid-argument-type]
+            container=c,
+            request_values=providers,
+        )
+        configure_container(app, c, request_values=providers)
+
+        @app.get("/")
+        def index(repo: Inject[TenantRepo]) -> dict:
+            return {"tenant": repo.tenant}
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            resp = await client.get(
+                "/",
+                headers={"x-tenant-id": "acme"},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json() == {"tenant": "acme"}
+
+    @pytest.mark.anyio
+    async def test_qualified_request_value(self) -> None:
+        c = Container()
+        app = FastAPI()
+        app.add_middleware(
+            RequestScopeMiddleware,  # ty: ignore[invalid-argument-type]
+            container=c,
+            request_values=[
+                RequestValueProvider(
+                    str,
+                    lambda r: r.headers.get(
+                        "x-correlation-id",
+                        "",
+                    ),
+                    qualifier="correlation_id",
+                ),
+            ],
+        )
+        configure_container(app, c)
+
+        @app.get("/")
+        def index(
+            ctr: Annotated[Container, Depends(_get_ctr)],
+        ) -> dict:
+            cid = ctr.get(str, qualifier="correlation_id")
+            return {"cid": cid}
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            resp = await client.get(
+                "/",
+                headers={"x-correlation-id": "req-42"},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json() == {"cid": "req-42"}
+
+    @pytest.mark.anyio
+    async def test_concurrent_requests_isolated(self) -> None:
+        providers = [
+            RequestValueProvider(
+                _TenantId,
+                lambda r: _TenantId(r.headers["x-tenant-id"]),
+            ),
+        ]
+        c = Container()
+        app = FastAPI()
+        app.add_middleware(
+            RequestScopeMiddleware,  # ty: ignore[invalid-argument-type]
+            container=c,
+            request_values=providers,
+        )
+        configure_container(app, c, request_values=providers)
+
+        @app.get("/")
+        def index(
+            ctr: Annotated[Container, Depends(_get_ctr)],
+        ) -> dict:
+            return {"tenant": ctr.get(_TenantId)}
+
+        results: list[httpx.Response] = []
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+
+            async def _fetch(tenant: str) -> None:
+                resp = await client.get(
+                    "/",
+                    headers={"x-tenant-id": tenant},
+                )
+                results.append(resp)
+
+            async with anyio.create_task_group() as tg:
+                tg.start_soon(_fetch, "acme")
+                tg.start_soon(_fetch, "globex")
+
+        tenants = {r.json()["tenant"] for r in results}
+        assert tenants == {"acme", "globex"}
 
 
 class TestUncoiledLifespan:

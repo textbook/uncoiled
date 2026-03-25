@@ -1,56 +1,56 @@
-"""FastAPI application — the only file that imports the web framework.
+"""FastAPI application — assembles container, middleware, and routes.
 
-The route handlers are thin: they receive a ``UserController`` via
-dependency injection and delegate immediately. Business logic stays
-in the controller, which has no idea it's running inside FastAPI.
+This is the composition root: it wires everything together but
+contains no business logic or route definitions.
 """
 
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 
 from example.config import DbConfig
-from example.controller import (  # noqa: TC001 — used in route annotations
-    CreateUserRequest,
-    UserController,
-)
-from example.domain import User  # noqa: TC001 — used in route annotations
+from example.domain import TenantId
+from example.routes import user_router
 from uncoiled import Container, EnvSource, bind_config
-from uncoiled.fastapi import Inject, uncoiled_lifespan
+from uncoiled.fastapi import (
+    RequestScopeMiddleware,
+    RequestValueProvider,
+    uncoiled_lifespan,
+)
 
-# ── Container setup ──────────────────────────────────────────────
+REQUEST_VALUES = [
+    RequestValueProvider(
+        TenantId,
+        lambda r: TenantId(r.headers.get("x-tenant-id", "default")),
+    ),
+]
+
+
+def create_app(container: Container) -> FastAPI:
+    """Build the FastAPI application.
+
+    Accepts a container so tests can supply their own registrations
+    while exercising the exact same routes and middleware.
+    """
+    application = FastAPI(lifespan=uncoiled_lifespan(container))
+    application.add_middleware(
+        RequestScopeMiddleware,  # ty: ignore[invalid-argument-type]
+        container=container,
+        request_values=REQUEST_VALUES,
+    )
+    application.include_router(user_router)
+    return application
+
+
+# ── Production wiring ────────────────────────────────────────────
 #
 # 1. Bind DbConfig from environment variables (e.g. DB_URL=...).
-# 2. Register it as an instance so the container can inject it.
-# 3. scan() discovers @component classes:
-#      - SqliteUserRepository (provides=UserRepository, needs DbConfig)
-#      - UserController (needs UserRepository)
+# 2. scan() discovers @component classes in the example package.
+# 3. create_app() adds RequestScopeMiddleware (extracts TenantId
+#    from X-Tenant-Id header) and includes the user routes.
 
 container = Container()
 container.register_instance(bind_config(DbConfig, EnvSource()))
 container.scan("example")
 
-app = FastAPI(lifespan=uncoiled_lifespan(container))
-
-# ── Routes ───────────────────────────────────────────────────────
-
-
-@app.get("/users")
-def list_users(ctrl: Inject[UserController]) -> list[User]:
-    """Return all users."""
-    return ctrl.list_users()
-
-
-@app.get("/users/{user_id}")
-def get_user(user_id: int, ctrl: Inject[UserController]) -> User:
-    """Return a single user by ID."""
-    try:
-        return ctrl.get_user(user_id)
-    except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-
-@app.post("/users", status_code=201)
-def create_user(body: CreateUserRequest, ctrl: Inject[UserController]) -> User:
-    """Create a new user."""
-    return ctrl.create_user(body)
+app = create_app(container)

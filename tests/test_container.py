@@ -616,6 +616,96 @@ class TestContainerFork:
         assert not isinstance(c.get(Repository), MockRepo)
 
 
+class _TenantId(str):
+    __slots__ = ()
+
+
+class TestRequestValue:
+    def test_register_and_provide_round_trip(self) -> None:
+        c = Container()
+        c.register_request_value(_TenantId)
+        with c.request_context():
+            c.provide_request_value(_TenantId, _TenantId("acme"))
+            assert c.get(_TenantId) == "acme"
+
+    def test_error_when_value_not_provided(self) -> None:
+        c = Container()
+        c.register_request_value(_TenantId)
+        with (
+            c.request_context(),
+            pytest.raises(
+                LookupError,
+                match="not provided",
+            ),
+        ):
+            c.get(_TenantId)
+
+    def test_provide_unregistered_raises(self) -> None:
+        c = Container()
+        with (
+            c.request_context(),
+            pytest.raises(
+                LookupError,
+                match="No request value registered",
+            ),
+        ):
+            c.provide_request_value(_TenantId, _TenantId("x"))
+
+    def test_qualified_request_value(self) -> None:
+        c = Container()
+        c.register_request_value(str, qualifier="correlation_id")
+        with c.request_context():
+            c.provide_request_value(
+                str,
+                "abc-123",
+                qualifier="correlation_id",
+            )
+            result = c.get(str, qualifier="correlation_id")
+            assert result == "abc-123"
+
+    def test_injected_into_request_scoped_component(self) -> None:
+        class TenantRepo:
+            def __init__(self, tenant: _TenantId) -> None:
+                self.tenant = tenant
+
+        c = Container()
+        c.register_request_value(_TenantId)
+        c.register(TenantRepo, scope=Scope.REQUEST)
+        with c.request_context():
+            c.provide_request_value(
+                _TenantId,
+                _TenantId("acme"),
+            )
+            repo = c.get(TenantRepo)
+            assert repo.tenant == "acme"
+
+    def test_graph_validation_passes(self) -> None:
+        class TenantRepo:
+            def __init__(self, tenant: _TenantId) -> None:
+                self.tenant = tenant
+
+        c = Container()
+        c.register_request_value(_TenantId)
+        c.register(TenantRepo, scope=Scope.REQUEST)
+        c.validate()  # should not raise
+
+    def test_different_values_across_contexts(self) -> None:
+        c = Container()
+        c.register_request_value(_TenantId)
+        with c.request_context():
+            c.provide_request_value(
+                _TenantId,
+                _TenantId("acme"),
+            )
+            assert c.get(_TenantId) == "acme"
+        with c.request_context():
+            c.provide_request_value(
+                _TenantId,
+                _TenantId("globex"),
+            )
+            assert c.get(_TenantId) == "globex"
+
+
 class TestRequestScope:
     def test_same_instance_within_context(self) -> None:
         c = Container()

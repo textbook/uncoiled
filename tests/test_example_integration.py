@@ -1,26 +1,28 @@
 """Integration tests for the example application.
 
-Uses the real ``app`` and its routes.  A module-scoped
-``uncoiled_container`` wires ``InMemoryUserRepository`` directly so
-``UserController`` is resolved with the test double — no override
-hack needed.
+Uses ``create_app`` from the production module so the tests exercise
+the exact same routes and middleware as the real app — only the
+container registrations differ (``InMemoryUserRepository`` instead
+of ``SqliteUserRepository``).
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import httpx
 import pytest
 
-from example.app import app
+from example.app import REQUEST_VALUES, create_app
 from example.controller import UserController
-from example.domain import User, UserRepository
+from example.domain import TenantId, User, UserRepository
 from uncoiled import Container, Inject
 from uncoiled.fastapi import configure_container
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from fastapi import FastAPI
 
 
 class InMemoryUserRepository:
@@ -47,11 +49,23 @@ class InMemoryUserRepository:
 
 
 @pytest.fixture(scope="module")
-def uncoiled_container() -> Iterator[Container]:
+def _test_app() -> FastAPI:
+    """Build the app once per module so the container fixture can wire it."""
     c = Container()
     c.scan("example")
     c.register(InMemoryUserRepository, provides=UserRepository)
-    configure_container(app, c)
+    application = create_app(c)
+    configure_container(
+        application,
+        c,
+        request_values=REQUEST_VALUES,
+    )
+    return application
+
+
+@pytest.fixture(scope="module")
+def uncoiled_container(_test_app: FastAPI) -> Iterator[Container]:
+    c: Container = _test_app.state.uncoiled_container
     with c:
         yield c
 
@@ -59,44 +73,69 @@ def uncoiled_container() -> Iterator[Container]:
 class TestViaInject:
     """Resolve through the ``inject`` fixture — no HTTP."""
 
-    def test_controller_uses_in_memory_repo(self, inject: Inject) -> None:
-        ctrl = inject[UserController]
-        assert isinstance(ctrl.repo, InMemoryUserRepository)
+    def test_controller_uses_in_memory_repo(
+        self,
+        inject: Inject,
+        uncoiled_container: Container,
+    ) -> None:
+        with uncoiled_container.request_context():
+            uncoiled_container.provide_request_value(
+                TenantId,
+                TenantId("test"),
+            )
+            controller = inject[UserController]
+            assert isinstance(controller.repo, InMemoryUserRepository)
 
-    def test_get_seeded_user(self, inject: Inject) -> None:
-        ctrl = inject[UserController]
-        assert ctrl.get_user(1).name == "Alice"
+    def test_get_seeded_user(
+        self,
+        inject: Inject,
+        uncoiled_container: Container,
+    ) -> None:
+        with uncoiled_container.request_context():
+            uncoiled_container.provide_request_value(
+                TenantId,
+                TenantId("test"),
+            )
+            controller = inject[UserController]
+            assert controller.get_user(1).name == "Alice"
 
 
 class TestHTTPRoutes:
     """Hit the real app routes via ASGI transport."""
 
+    _headers: ClassVar[dict[str, str]] = {"x-tenant-id": "acme"}
+
+    @pytest.fixture(autouse=True)
+    def _app(self, _test_app: FastAPI) -> None:
+        self._test_app = _test_app
+
     def _client(self) -> httpx.AsyncClient:
         return httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app),
+            transport=httpx.ASGITransport(app=self._test_app),
             base_url="http://test",
         )
 
     @pytest.mark.anyio
     async def test_list_users(self) -> None:
         async with self._client() as client:
-            resp = await client.get("/users")
+            resp = await client.get("/users", headers=self._headers)
         assert resp.status_code == 200
-        users = resp.json()
-        assert len(users) >= 1
-        assert users[0]["name"] == "Alice"
+        body = resp.json()
+        assert body["tenant"] == "acme"
+        assert len(body["users"]) >= 1
+        assert body["users"][0]["name"] == "Alice"
 
     @pytest.mark.anyio
     async def test_get_user(self) -> None:
         async with self._client() as client:
-            resp = await client.get("/users/1")
+            resp = await client.get("/users/1", headers=self._headers)
         assert resp.status_code == 200
         assert resp.json()["name"] == "Alice"
 
     @pytest.mark.anyio
     async def test_get_missing_user_returns_404(self) -> None:
         async with self._client() as client:
-            resp = await client.get("/users/999")
+            resp = await client.get("/users/999", headers=self._headers)
         assert resp.status_code == 404
 
     @pytest.mark.anyio
@@ -105,6 +144,7 @@ class TestHTTPRoutes:
             resp = await client.post(
                 "/users",
                 json={"name": "Carol", "email": "carol@example.com"},
+                headers=self._headers,
             )
         assert resp.status_code == 201
         assert resp.json()["name"] == "Carol"

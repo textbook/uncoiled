@@ -5,12 +5,14 @@ from __future__ import annotations
 __all__ = [
     "Inject",
     "RequestScopeMiddleware",
+    "RequestValueProvider",
     "configure_container",
     "inject_dependency",
     "uncoiled_lifespan",
 ]
 
 import contextlib
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends, Request
@@ -18,7 +20,7 @@ from fastapi import Depends, Request
 from ._container import Container  # noqa: TC001 — used at runtime in Depends()
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Callable
+    from collections.abc import AsyncIterator, Callable, Sequence
 
     from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -60,18 +62,48 @@ def inject_dependency[T](type_: type[T]) -> T:
     return Depends(_resolve)
 
 
+@dataclass(frozen=True)
+class RequestValueProvider:
+    """Declare a value extracted from each HTTP request and injected into the container.
+
+    *type_* is the type to register; *extractor* receives the Starlette
+    ``Request`` and returns the value; *qualifier* disambiguates when
+    multiple values share the same type.
+    """
+
+    type_: type
+    extractor: Callable[[Request], object]
+    qualifier: str | None = None
+
+
 class RequestScopeMiddleware:
     """ASGI middleware that opens a request scope context per request."""
 
-    def __init__(self, app: ASGIApp, container: Container) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        container: Container,
+        request_values: Sequence[RequestValueProvider] = (),
+    ) -> None:
         """Initialise with the ASGI app and container."""
         self._app = app
         self._container = container
+        self._request_values = request_values
+        for rv in request_values:
+            container.register_request_value(rv.type_, qualifier=rv.qualifier)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Wrap HTTP requests in a request scope context."""
         if scope["type"] in {"http", "websocket"}:
             with self._container.request_context():
+                if self._request_values:
+                    request = Request(scope, receive, send)
+                    for rv in self._request_values:
+                        self._container.provide_request_value(
+                            rv.type_,
+                            rv.extractor(request),
+                            qualifier=rv.qualifier,
+                        )
                 await self._app(scope, receive, send)
         else:
             await self._app(scope, receive, send)
@@ -98,10 +130,18 @@ def uncoiled_lifespan(
     return _lifespan
 
 
-def configure_container(app: object, container: Container) -> None:
+def configure_container(
+    app: object,
+    container: Container,
+    request_values: Sequence[RequestValueProvider] = (),
+) -> None:
     """Attach a container to the app and start it.
 
     Convenience for test setups where the ASGI lifespan is not triggered.
+    Pass *request_values* so the container registers them before
+    ``start()`` validates the dependency graph.
     """
+    for rv in request_values:
+        container.register_request_value(rv.type_, qualifier=rv.qualifier)
     app.state.uncoiled_container = container  # ty: ignore[unresolved-attribute]
     container.start()

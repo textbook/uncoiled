@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from example.domain import User, UserRepository
-from uncoiled import component
+from example.domain import TenantId, User, UserRepository
+from uncoiled import Scope, component
 
 
 @dataclass(frozen=True)
@@ -20,17 +20,19 @@ class CreateUserRequest:
     email: str
 
 
-@component
+@component(scope=Scope.REQUEST)
 @dataclass
 class UserController:
     """Thin orchestration layer between HTTP and domain logic.
 
     This class has *zero* web-framework imports — it doesn't know about
-    FastAPI, Flask, or any other web framework. It only depends on
-    ``UserRepository``, which is a plain Protocol.
+    FastAPI, Flask, or any other web framework. ``TenantId`` arrives
+    via constructor injection from the request scope — the controller
+    never touches headers or the HTTP layer.
     """
 
     repo: UserRepository
+    tenant: TenantId
 
     def get_user(self, user_id: int) -> User:
         """Retrieve a single user or raise."""
