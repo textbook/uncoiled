@@ -42,15 +42,16 @@ def create_app(container: Container) -> FastAPI:
     return application
 
 
-# ── Production wiring ────────────────────────────────────────────
-#
-# 1. Bind DbConfig from environment variables (e.g. DB_URL=...).
-# 2. scan() discovers @component classes in the example package.
-# 3. create_app() adds RequestScopeMiddleware (extracts TenantId
-#    from X-Tenant-Id header) and includes the user routes.
+def create_default_app() -> FastAPI:
+    """Build the production app with env-sourced config.
 
-container = Container()
-container.register_instance(bind_config(DbConfig, EnvSource()))
-container.scan("example")
+    Container creation happens inside this function so that
+    importing the module does not trigger side effects (env var
+    reads, component scanning).  ASGI servers call this via::
 
-app = create_app(container)
+        uvicorn example.app:app --factory
+    """
+    c = Container()
+    c.register_instance(bind_config(DbConfig, EnvSource()))
+    c.scan("example")
+    return create_app(c)
