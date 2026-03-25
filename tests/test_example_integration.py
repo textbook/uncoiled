@@ -16,7 +16,7 @@ import pytest
 from example.app import REQUEST_VALUES, create_app
 from example.controller import UserController
 from example.domain import TenantId, User, UserRepository
-from uncoiled import Container, Inject
+from uncoiled import Container, Resolve
 from uncoiled.fastapi import configure_container
 
 if TYPE_CHECKING:
@@ -75,7 +75,7 @@ class TestViaInject:
 
     def test_controller_uses_in_memory_repo(
         self,
-        inject: Inject,
+        inject: Resolve,
         uncoiled_container: Container,
     ) -> None:
         with uncoiled_container.request_context():
@@ -88,7 +88,7 @@ class TestViaInject:
 
     def test_get_seeded_user(
         self,
-        inject: Inject,
+        inject: Resolve,
         uncoiled_container: Container,
     ) -> None:
         with uncoiled_container.request_context():
