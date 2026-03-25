@@ -3,46 +3,14 @@
 from __future__ import annotations
 
 import dataclasses
-from pathlib import Path
 from typing import TYPE_CHECKING, get_type_hints
+
+from uncoiled._coercion import coerce
 
 from ._relaxed import normalise
 
 if TYPE_CHECKING:
     from ._sources import ConfigSource
-
-
-def _parse_bool(value: str) -> bool:
-    """Parse a string to a boolean value."""
-    if value.lower() in ("true", "1", "yes", "on"):
-        return True
-    if value.lower() in ("false", "0", "no", "off"):
-        return False
-    msg = f"Cannot coerce '{value}' to bool"
-    raise ValueError(msg)
-
-
-_COERCIONS: dict[type, object] = {
-    str: str,
-    int: int,
-    float: float,
-    bool: _parse_bool,
-    Path: Path,
-}
-
-
-def _coerce(value: str, target_type: type) -> object:
-    """Coerce a string value to the target type."""
-    if target_type is list or (
-        hasattr(target_type, "__origin__") and target_type.__origin__ is list
-    ):
-        return [item.strip() for item in value.split(",") if item.strip()]
-
-    coercer = _COERCIONS.get(target_type)
-    if coercer is not None:
-        return coercer(value)  # ty: ignore[call-non-callable]
-
-    return value
 
 
 def config_properties(
@@ -86,7 +54,7 @@ def bind_config[T](cls: type[T], source: ConfigSource) -> T:
         raw = source.get(normalise(key))
         if raw is not None:
             try:
-                kwargs[field.name] = _coerce(raw, hints[field.name])
+                kwargs[field.name] = coerce(raw, hints[field.name])
             except (ValueError, TypeError) as exc:
                 target = hints[field.name]
                 type_name = getattr(target, "__name__", str(target))
