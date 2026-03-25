@@ -53,7 +53,7 @@ def _test_app() -> FastAPI:
     """Build the app once per module so the container fixture can wire it."""
     c = Container()
     c.scan("example")
-    c.register(InMemoryUserRepository, provides=UserRepository)
+    c.register(InMemoryUserRepository, provides=UserRepository, replace=True)
     application = create_app(c)
     configure_container(
         application,
