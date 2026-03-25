@@ -2,6 +2,14 @@ from typing import Annotated, Optional, Union
 
 import pytest
 
+from tests._future_annotations_helpers import (
+    ChildConfig,
+    ForwardRefService,
+    LateDefinedClass,
+    OptionalService,
+)
+from tests._future_annotations_helpers import Repository as FutureRepo
+from tests._future_annotations_helpers import UserService as FutureService
 from uncoiled import DependencySpec, Qualifier, inspect_dependencies
 
 
@@ -277,6 +285,31 @@ class TestInspectDependencies:
         assert len(specs) == 1
         assert specs[0].qualifier == "pg"
         assert specs[0].required_type is Repository
+
+    def test_future_annotations_resolves_types(self) -> None:
+        """Classes using ``from __future__ import annotations`` should work."""
+        specs = inspect_dependencies(FutureService)
+        assert len(specs) == 1
+        assert specs[0].name == "repo"
+        assert specs[0].required_type is FutureRepo
+
+    def test_future_annotations_optional(self) -> None:
+        specs = inspect_dependencies(OptionalService)
+        assert len(specs) == 1
+        assert specs[0].required_type is FutureRepo
+        assert specs[0].optional is True
+
+    def test_future_annotations_forward_ref(self) -> None:
+        specs = inspect_dependencies(ForwardRefService)
+        assert len(specs) == 1
+        assert specs[0].required_type is LateDefinedClass
+
+    def test_future_annotations_dataclass_inheritance(self) -> None:
+        specs = inspect_dependencies(ChildConfig)
+        field_names = {s.name for s in specs}
+        assert "host" in field_names
+        assert "port" in field_names
+        assert "name" in field_names
 
     def test_function_inspection(self) -> None:
         def factory(repo: Repository, name: str = "x") -> UserService:
