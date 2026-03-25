@@ -1256,3 +1256,29 @@ class TestVisualise:
         c.register(OptService)
         result = c.visualise()
         assert "-.->" in result
+
+    def test_output_is_valid_mermaid(self) -> None:
+        """Verify the generated graph parses as valid Mermaid syntax."""
+
+        class RepoImpl(Repository):
+            pass
+
+        class Service:
+            def __init__(
+                self,
+                repo: Repository,
+                url: Annotated[str, EnvVar("DB_URL")] = ":memory:",
+                backup: Repository | None = None,
+            ) -> None:
+                self.repo = repo
+                self.url = url
+                self.backup = backup
+
+        c = Container()
+        c.register(RepoImpl, provides=Repository, qualifier="primary")
+        c.register(Service, scope=Scope.TRANSIENT)
+        result = c.visualise()
+
+        from mermaid import Mermaid  # noqa: PLC0415
+
+        Mermaid(result)  # raises MermaidError on invalid syntax
