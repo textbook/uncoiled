@@ -26,5 +26,11 @@ jobs:
       - run: "uv run ty check"
       - run: "uv run ruff check"
       - run: "uv run ruff format --check"
+      - name: "mypy (informational)"
+        run: "uv run mypy src/uncoiled/ --ignore-missing-imports"
+        continue-on-error: true
+      - name: "pyright (informational)"
+        run: "uv run pyright src/uncoiled/"
+        continue-on-error: true
       - run: "uv run coverage run --module pytest"
       - run: "uv run coverage report"
