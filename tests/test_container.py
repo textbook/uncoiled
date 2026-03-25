@@ -1203,20 +1203,35 @@ class TestVisualise:
         assert "UserService" in result
         assert "-->" in result
 
-    def test_scope_shown_for_non_singleton(self) -> None:
+    def test_scope_label_uses_quoted_br(self) -> None:
         c = Container()
         c.register(Repository, scope=Scope.TRANSIENT)
         result = c.visualise()
-        assert "transient" in result
+        assert '"Repository<br/>(transient)"' in result
 
-    def test_qualifier_shown(self) -> None:
+    def test_qualifier_label_uses_quoted_br(self) -> None:
         class RepoA(Repository):
             pass
 
         c = Container()
         c.register(RepoA, provides=Repository, qualifier="primary")
         result = c.visualise()
-        assert "primary" in result
+        assert '"RepoA<br/>(as Repository, qualifier=primary)"' in result
+
+    def test_provides_label_uses_quoted_br(self) -> None:
+        class Impl(Repository):
+            pass
+
+        c = Container()
+        c.register(Impl, provides=Repository)
+        result = c.visualise()
+        assert '"Impl<br/>(as Repository)"' in result
+
+    def test_singleton_label_has_no_annotation(self) -> None:
+        c = Container()
+        c.register(Repository)
+        result = c.visualise()
+        assert "Repository[Repository]" in result
 
     def test_envvar_shown(self) -> None:
         class Service:
