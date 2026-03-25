@@ -30,7 +30,7 @@ def _node_label(node: ComponentNode) -> str:
     if node.scope is not Scope.SINGLETON:
         parts.append(node.scope.value)
     if parts:
-        return f"{name}\\n({', '.join(parts)})"
+        return f'"{name}<br/>({", ".join(parts)})"'
     return name
 
 
