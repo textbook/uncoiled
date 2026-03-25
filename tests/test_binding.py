@@ -92,3 +92,19 @@ class TestConfigProperties:
         source = DictSource({})
         with pytest.raises(ValueError, match="Missing required"):
             bind_config(SvcConfig, source)
+
+    def test_bind_config_invalid_int_shows_key(self) -> None:
+        source = DictSource({"db.host": "localhost", "db.port": "not_a_number"})
+        with pytest.raises(
+            ValueError,
+            match=r"Cannot coerce config key 'db\.port'.*to int",
+        ):
+            bind_config(DbConfig, source)
+
+    def test_bind_config_invalid_bool_shows_key(self) -> None:
+        source = DictSource({"app.name": "test", "app.debug": "not_a_bool"})
+        with pytest.raises(
+            ValueError,
+            match=r"Cannot coerce config key 'app\.debug'.*to bool",
+        ):
+            bind_config(AppConfig, source)
