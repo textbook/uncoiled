@@ -102,6 +102,36 @@ class TestContainerRegistration:
         with pytest.raises(ValueError, match=r"destroy_method.*nonexistent"):
             c.register(Repository, destroy_method="nonexistent")
 
+    def test_register_incompatible_provides_raises(self) -> None:
+        c = Container()
+        with pytest.raises(TypeError, match="str is not a subclass of int"):
+            c.register(str, provides=int)
+
+    def test_register_compatible_provides_passes(self) -> None:
+        class Base:
+            pass
+
+        class Sub(Base):
+            pass
+
+        c = Container()
+        c.register(Sub, provides=Base)
+        assert isinstance(c.get(Base), Sub)
+
+    def test_register_provides_protocol_skips_check(self) -> None:
+        from typing import Protocol, runtime_checkable  # noqa: PLC0415
+
+        @runtime_checkable
+        class Greeter(Protocol):
+            def greet(self) -> str: ...
+
+        class EnglishGreeter:
+            def greet(self) -> str:
+                return "hello"
+
+        c = Container()
+        c.register(EnglishGreeter, provides=Greeter)  # should not raise
+
 
 class TestContainerResolution:
     def test_singleton_scope(self) -> None:
