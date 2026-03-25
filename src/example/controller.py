@@ -6,7 +6,7 @@ The DI container wires in the real thing at runtime.
 
 from __future__ import annotations
 
-import logging  # noqa: TC003 — used at runtime in create_user
+import logging  # noqa: TC003 — must be importable for DI annotation introspection
 from dataclasses import dataclass
 
 from example.domain import TenantId, User, UserRepository
