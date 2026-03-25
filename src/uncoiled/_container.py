@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import importlib
 import inspect
+import logging
 import os
 import pkgutil
 from typing import TYPE_CHECKING, Self
@@ -368,7 +369,7 @@ class Container:
 
         kwargs: dict[str, object] = {}
         for dep in node.dependencies:
-            self._resolve_dependency(dep, kwargs)
+            self._resolve_dependency(dep, kwargs, node=node)
 
         if node.factory is not None:
             result = node.factory(**kwargs)  # ty: ignore[call-non-callable]
@@ -397,7 +398,7 @@ class Container:
 
         kwargs: dict[str, object] = {}
         for dep in node.dependencies:
-            self._resolve_dependency(dep, kwargs)
+            self._resolve_dependency(dep, kwargs, node=node)
 
         if node.factory is not None:
             result = node.factory(**kwargs)  # ty: ignore[call-non-callable]
@@ -417,6 +418,8 @@ class Container:
         self,
         dep: DependencySpec,
         kwargs: dict[str, object],
+        *,
+        node: ComponentNode,
     ) -> None:
         """Resolve a single dependency into kwargs."""
         if dep.env_var is not None:
@@ -429,6 +432,8 @@ class Container:
                     " and no default was provided"
                 )
                 raise LookupError(msg)
+        elif dep.required_type is logging.Logger:
+            kwargs[dep.name] = logging.getLogger(node.impl.__module__)
         elif dep.is_list:
             kwargs[dep.name] = self.get_all(dep.required_type, dep.qualifier)
         elif dep.optional or dep.has_default:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from ._inspection import inspect_dependencies
@@ -69,6 +70,11 @@ def render_mermaid(
                 lines.append(f"    {env_id}[/{dep.env_var}/]:::env_var")
                 style = "-.->" if dep.has_default else "-->"
                 lines.append(f"    {env_id} {style} {target_id}")
+                continue
+
+            if dep.required_type is logging.Logger:
+                lines.append("    Logger[/Logger/]:::env_var")
+                lines.append(f"    Logger -.-> {target_id}")
                 continue
 
             dep_key = (dep.required_type, dep.qualifier)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 
@@ -52,7 +53,11 @@ def build_graph(
         for dep in node.dependencies:
             dep_key = _type_key(dep.required_type, dep.qualifier)
 
-            if dep.is_list or dep.env_var is not None:
+            if (
+                dep.is_list
+                or dep.env_var is not None
+                or dep.required_type is logging.Logger
+            ):
                 continue
 
             if dep_key not in registrations:
