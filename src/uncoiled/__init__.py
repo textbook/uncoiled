@@ -19,7 +19,7 @@ from ._errors import DependencyResolutionError, FailureKind, ResolutionFailure
 from ._graph import ComponentNode, build_graph, validate_graph
 from ._inspection import DependencySpec, inspect_dependencies
 from ._lifecycle import async_call_destroy, async_call_init, call_destroy, call_init
-from ._pytest import Inject
+from ._pytest import Resolve
 from ._qualifiers import Qualifier
 from ._scope import RequestScope, ScopeManager, SingletonScope, TransientScope
 from ._types import MISSING, AsyncDisposable, Disposable, Factory, Scope
@@ -39,11 +39,11 @@ __all__ = [
     "EnvSource",
     "Factory",
     "FailureKind",
-    "Inject",
     "LayeredSource",
     "Qualifier",
     "RequestScope",
     "ResolutionFailure",
+    "Resolve",
     "Scope",
     "ScopeManager",
     "SingletonScope",

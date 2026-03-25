@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
-class Inject:
+class Resolve:
     """Function-scoped helper to resolve types from the container."""
 
     def __init__(self, container: Container) -> None:
@@ -34,9 +34,9 @@ def uncoiled_container() -> Iterator[Container]:
 
 
 @pytest.fixture
-def inject(uncoiled_container: Container) -> Inject:
+def inject(uncoiled_container: Container) -> Resolve:
     """Function-scoped fixture to resolve types from the container."""
-    return Inject(uncoiled_container)
+    return Resolve(uncoiled_container)
 
 
 @pytest.fixture(autouse=True)

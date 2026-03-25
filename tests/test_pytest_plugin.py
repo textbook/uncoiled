@@ -1,6 +1,6 @@
 import pytest
 
-from uncoiled import Container, Inject
+from uncoiled import Container, Resolve
 
 
 class Repository:
@@ -11,20 +11,20 @@ class MockRepo(Repository):
     pass
 
 
-class TestInject:
+class TestResolve:
     def test_getitem_resolves_type(self) -> None:
         c = Container()
         c.register(Repository)
         c.start()
-        inject = Inject(c)
-        assert isinstance(inject[Repository], Repository)
+        resolve = Resolve(c)
+        assert isinstance(resolve[Repository], Repository)
 
     def test_getitem_raises_for_missing(self) -> None:
         c = Container()
         c.start()
-        inject = Inject(c)
+        resolve = Resolve(c)
         with pytest.raises(LookupError):
-            inject[Repository]
+            resolve[Repository]
 
 
 class TestPluginFixtures:
@@ -58,8 +58,8 @@ def uncoiled_container():
         configured_pytester.makepyfile(
             """\
 def test_inject(inject):
-    from uncoiled import Inject
-    assert isinstance(inject, Inject)
+    from uncoiled import Resolve
+    assert isinstance(inject, Resolve)
 """
         )
         result = configured_pytester.runpytest()
