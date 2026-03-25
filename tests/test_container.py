@@ -1,4 +1,5 @@
 import types
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Annotated, Protocol
 
@@ -114,6 +115,27 @@ class TestContainerRegistration:
 
         c = Container()
         c.register(Impl, provides=MyProtocol)
+
+    def test_register_provides_abc_validates(self) -> None:
+        class Base(ABC):
+            @abstractmethod
+            def do_thing(self) -> None: ...
+
+        class Impl(Base):
+            def do_thing(self) -> None: ...
+
+        c = Container()
+        c.register(Impl, provides=Base)
+        assert isinstance(c.get(Base), Impl)
+
+    def test_register_provides_abc_rejects_incompatible(self) -> None:
+        class Base(ABC):
+            @abstractmethod
+            def do_thing(self) -> None: ...
+
+        c = Container()
+        with pytest.raises(TypeError, match="not a subclass"):
+            c.register(str, provides=Base)
 
     def test_register_rejects_invalid_init_method(self) -> None:
         c = Container()
