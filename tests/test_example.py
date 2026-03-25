@@ -6,6 +6,7 @@ no HTTP, just plain Python.
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import Mock
 
 import pytest
@@ -20,6 +21,7 @@ class TestUserController:
         self.controller = UserController(
             repo=self.repo,
             tenant=TenantId("test-tenant"),
+            logger=logging.getLogger("test"),
         )
 
     def test_get_user(self) -> None:
