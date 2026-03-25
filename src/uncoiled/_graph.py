@@ -88,6 +88,29 @@ def build_graph(
                 )
                 continue
 
+            dep_node = registrations[dep_key]
+            if node.scope is Scope.SINGLETON and dep_node.scope is Scope.REQUEST:
+                failures.append(
+                    ResolutionFailure(
+                        kind=FailureKind.SCOPE_MISMATCH,
+                        message=(
+                            f"Singleton '{node.impl.__name__}' depends on "
+                            f"request-scoped '{dep_node.impl.__name__}' — "
+                            f"singletons cannot depend on request-scoped "
+                            f"components because they are created at startup "
+                            f"before any request context exists."
+                        ),
+                        suggestion=(
+                            f"Change '{node.impl.__name__}' to request scope, "
+                            f"or remove the dependency on "
+                            f"'{dep_node.impl.__name__}'."
+                        ),
+                        component=node.impl,
+                        parameter=dep.name,
+                    ),
+                )
+                continue
+
             adj[dep_key].add(key)
             in_degree[key] = in_degree.get(key, 0) + 1
 

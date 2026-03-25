@@ -9,6 +9,7 @@ from uncoiled import (
     DependencyResolutionError,
     FailureKind,
     Qualifier,
+    Scope,
     build_graph,
     validate_graph,
 )
@@ -47,6 +48,25 @@ class NeedsOptThenReq:
     def __init__(self, opt: Repository | None, req: ExtraService) -> None:
         self.opt = opt
         self.req = req
+
+
+class RequestDep:
+    pass
+
+
+class SingletonNeedsRequest:
+    def __init__(self, dep: RequestDep) -> None:
+        self.dep = dep
+
+
+class RequestNeedsRequest:
+    def __init__(self, dep: RequestDep) -> None:
+        self.dep = dep
+
+
+class TransientNeedsRequest:
+    def __init__(self, dep: RequestDep) -> None:
+        self.dep = dep
 
 
 class TestBuildGraph:
@@ -255,6 +275,62 @@ class TestBuildGraph:
         assert len(failures) == 1
         assert failures[0].kind is FailureKind.MISSING
         assert "ExtraService" in failures[0].message
+
+
+class TestScopeMismatch:
+    def test_singleton_depending_on_request_scoped_fails_validation(self) -> None:
+        """A singleton cannot depend on a request-scoped component."""
+        registrations = _make_registrations(
+            ComponentNode(
+                impl=RequestDep,
+                provides=RequestDep,
+                scope=Scope.REQUEST,
+            ),
+            ComponentNode(
+                impl=SingletonNeedsRequest,
+                provides=SingletonNeedsRequest,
+                scope=Scope.SINGLETON,
+            ),
+        )
+        failures = build_graph(registrations)
+        assert len(failures) == 1
+        assert failures[0].kind is FailureKind.SCOPE_MISMATCH
+        assert "SingletonNeedsRequest" in failures[0].message
+        assert "RequestDep" in failures[0].message
+        assert failures[0].component is SingletonNeedsRequest
+        assert failures[0].parameter == "dep"
+
+    def test_request_scoped_depending_on_request_scoped_passes(self) -> None:
+        """A request-scoped component can depend on another request-scoped one."""
+        registrations = _make_registrations(
+            ComponentNode(
+                impl=RequestDep,
+                provides=RequestDep,
+                scope=Scope.REQUEST,
+            ),
+            ComponentNode(
+                impl=RequestNeedsRequest,
+                provides=RequestNeedsRequest,
+                scope=Scope.REQUEST,
+            ),
+        )
+        assert build_graph(registrations) == []
+
+    def test_transient_depending_on_request_scoped_passes(self) -> None:
+        """A transient component can depend on a request-scoped one."""
+        registrations = _make_registrations(
+            ComponentNode(
+                impl=RequestDep,
+                provides=RequestDep,
+                scope=Scope.REQUEST,
+            ),
+            ComponentNode(
+                impl=TransientNeedsRequest,
+                provides=TransientNeedsRequest,
+                scope=Scope.TRANSIENT,
+            ),
+        )
+        assert build_graph(registrations) == []
 
 
 class TestValidateGraph:
