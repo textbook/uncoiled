@@ -1,3 +1,4 @@
+import logging
 import types
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -393,6 +394,54 @@ class TestEnvVar:
                 db_url: Annotated[str, EnvVar("DB_URL")] = ":memory:",
             ) -> None:
                 self.db_url = db_url
+
+        c = Container()
+        c.register(Service)
+        c.validate()  # should not raise
+
+
+class TestLoggerInjection:
+    def test_logger_auto_injected(self) -> None:
+        class Service:
+            def __init__(self, logger: logging.Logger) -> None:
+                self.logger = logger
+
+        c = Container()
+        c.register(Service)
+        svc = c.get(Service)
+        assert isinstance(svc.logger, logging.Logger)
+
+    def test_logger_named_after_module(self) -> None:
+        class Service:
+            def __init__(self, logger: logging.Logger) -> None:
+                self.logger = logger
+
+        c = Container()
+        c.register(Service)
+        svc = c.get(Service)
+        assert svc.logger.name == Service.__module__
+
+    def test_logger_with_other_deps(self) -> None:
+        class Service:
+            def __init__(
+                self,
+                repo: Repository,
+                logger: logging.Logger,
+            ) -> None:
+                self.repo = repo
+                self.logger = logger
+
+        c = Container()
+        c.register(Repository)
+        c.register(Service)
+        svc = c.get(Service)
+        assert isinstance(svc.repo, Repository)
+        assert isinstance(svc.logger, logging.Logger)
+
+    def test_logger_passes_validation(self) -> None:
+        class Service:
+            def __init__(self, logger: logging.Logger) -> None:
+                self.logger = logger
 
         c = Container()
         c.register(Service)
