@@ -432,7 +432,10 @@ class Container:
                     " and no default was provided"
                 )
                 raise LookupError(msg)
-        elif dep.required_type is logging.Logger:
+        elif (
+            dep.required_type is logging.Logger
+            and (dep.required_type, dep.qualifier) not in self._registrations
+        ):
             kwargs[dep.name] = logging.getLogger(node.impl.__module__)
         elif dep.is_list:
             kwargs[dep.name] = self.get_all(dep.required_type, dep.qualifier)

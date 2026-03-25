@@ -56,7 +56,9 @@ def build_graph(
             if (
                 dep.is_list
                 or dep.env_var is not None
-                or dep.required_type is logging.Logger
+                or (
+                    dep.required_type is logging.Logger and dep_key not in registrations
+                )
             ):
                 continue
 

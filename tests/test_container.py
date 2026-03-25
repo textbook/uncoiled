@@ -447,6 +447,19 @@ class TestLoggerInjection:
         c.register(Service)
         c.validate()  # should not raise
 
+    def test_explicit_registration_overrides_auto_logger(self) -> None:
+        class Service:
+            def __init__(self, logger: logging.Logger) -> None:
+                self.logger = logger
+
+        custom = logging.getLogger("custom")
+        c = Container()
+        c.register_instance(custom, type_=logging.Logger)
+        c.register(Service)
+        svc = c.get(Service)
+        assert svc.logger is custom
+        assert svc.logger.name == "custom"
+
 
 class TestContainerValidation:
     def test_validate_raises_on_missing(self) -> None:
