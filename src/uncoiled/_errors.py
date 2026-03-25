@@ -11,7 +11,6 @@ class FailureKind(enum.Enum):
 
     MISSING = "missing"
     CIRCULAR = "circular"
-    AMBIGUOUS = "ambiguous"
     SCOPE_MISMATCH = "scope_mismatch"
 
 
