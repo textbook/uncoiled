@@ -120,6 +120,14 @@ def uncoiled_lifespan(
 
     @contextlib.asynccontextmanager
     async def _lifespan(app: object) -> AsyncIterator[None]:
+        existing: Container | None = getattr(
+            getattr(app, "state", None),
+            "uncoiled_container",
+            None,
+        )
+        if existing is not None:
+            yield
+            return
         app.state.uncoiled_container = container  # ty: ignore[unresolved-attribute]
         container.start()
         try:

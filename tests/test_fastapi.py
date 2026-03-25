@@ -276,3 +276,23 @@ class TestUncoiledLifespan:
 
         # After exiting, lifespan closes the container
         assert res.closed
+
+    @pytest.mark.anyio
+    async def test_lifespan_preserves_preconfigured_container(self) -> None:
+        """Lifespan must not overwrite a container set by configure_container."""
+        test_container = Container()
+        test_container.register(Repository)
+
+        prod_container = Container()
+
+        app = FastAPI(lifespan=uncoiled_lifespan(prod_container))
+        configure_container(app, test_container)
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            # Trigger a request so the lifespan runs
+            await client.get("/nonexistent")
+
+        assert app.state.uncoiled_container is test_container
