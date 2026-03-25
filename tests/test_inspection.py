@@ -288,3 +288,40 @@ class TestInspectDependencies:
         assert len(specs) == expected
         assert specs[0].name == "repo"
         assert specs[1].has_default is True
+
+    def test_pep695_typevar_param_skipped(self) -> None:
+        """TypeVar parameters are not concrete types and should be skipped."""
+
+        class Handler[T]:
+            def __init__(self, item: T) -> None:
+                self.item = item
+
+        specs = inspect_dependencies(Handler)
+        assert len(specs) == 0
+
+    def test_pep695_concrete_subclass_inherits_typevar(self) -> None:
+        """Concrete subclass inherits __init__ with TypeVar — still skipped."""
+
+        class Handler[T]:
+            def __init__(self, item: T) -> None:
+                self.item = item
+
+        class RepoHandler(Handler[Repository]):
+            pass
+
+        # TypeVar T in the inherited __init__ is not resolved to Repository
+        specs = inspect_dependencies(RepoHandler)
+        assert len(specs) == 0
+
+    def test_pep695_generic_with_concrete_deps(self) -> None:
+        """Concrete deps alongside TypeVar params are resolved normally."""
+
+        class Service[T]:
+            def __init__(self, repo: Repository, config: T) -> None:
+                self.repo = repo
+                self.config = config
+
+        specs = inspect_dependencies(Service)
+        assert len(specs) == 1
+        assert specs[0].name == "repo"
+        assert specs[0].required_type is Repository
