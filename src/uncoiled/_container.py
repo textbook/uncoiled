@@ -256,12 +256,7 @@ class Container:
                 call_destroy(instance, destroy_method)
             except Exception as exc:  # noqa: BLE001
                 errors.append(exc)
-        for gen in reversed(self._generators):
-            try:
-                with contextlib.suppress(StopIteration):
-                    next(gen)
-            except Exception as exc:  # noqa: BLE001
-                errors.append(exc)
+        self._exhaust_generators(errors)
         self._instances.clear()
         self._generators.clear()
         for scope_manager in self._scopes.values():
@@ -280,16 +275,7 @@ class Container:
                 await async_call_destroy(instance, destroy_method)
             except Exception as exc:  # noqa: BLE001
                 errors.append(exc)
-        for gen in reversed(self._generators):
-            try:
-                if inspect.isasyncgen(gen):
-                    with contextlib.suppress(StopAsyncIteration):
-                        await gen.__anext__()
-                else:
-                    with contextlib.suppress(StopIteration):
-                        next(gen)
-            except Exception as exc:  # noqa: BLE001
-                errors.append(exc)
+        await self._aexhaust_generators(errors)
         self._instances.clear()
         self._generators.clear()
         for scope_manager in self._scopes.values():
@@ -556,6 +542,28 @@ class Container:
         if not is_sub:
             msg = f"{impl.__name__} is not a subclass of {provides.__name__}"
             raise TypeError(msg)
+
+    def _exhaust_generators(self, errors: list[Exception]) -> None:
+        """Advance sync generators past yield to run cleanup code."""
+        for gen in reversed(self._generators):
+            try:
+                with contextlib.suppress(StopIteration):
+                    next(gen)  # ty: ignore[invalid-argument-type]
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
+
+    async def _aexhaust_generators(self, errors: list[Exception]) -> None:
+        """Advance all generators (sync and async) past yield."""
+        for gen in reversed(self._generators):
+            try:
+                if inspect.isasyncgen(gen):
+                    with contextlib.suppress(StopAsyncIteration):
+                        await gen.__anext__()
+                else:
+                    with contextlib.suppress(StopIteration):
+                        next(gen)  # ty: ignore[invalid-argument-type]
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
 
     def _check_scope(self, scope: Scope) -> None:
         """Raise if the scope has no registered manager."""
