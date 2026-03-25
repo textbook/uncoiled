@@ -9,6 +9,7 @@ import os
 import pkgutil
 from typing import TYPE_CHECKING, Self
 
+from ._coercion import coerce
 from ._graph import ComponentNode, validate_graph
 from ._inspection import DependencySpec, inspect_dependencies
 from ._lifecycle import async_call_destroy, async_call_init, call_destroy, call_init
@@ -24,26 +25,6 @@ if TYPE_CHECKING:
 
 
 _REQUEST_VALUE_SENTINEL = object()
-
-_BOOL_TRUE = frozenset({"1", "true", "yes", "on"})
-_BOOL_FALSE = frozenset({"0", "false", "no", "off"})
-
-
-def _coerce_env(value: str, target: type) -> object:
-    """Coerce a string environment variable to the target type."""
-    if target is str:
-        return value
-    if target is bool:
-        lower = value.lower()
-        if lower in _BOOL_TRUE:
-            return True
-        if lower in _BOOL_FALSE:
-            return False
-        msg = f"Cannot convert {value!r} to bool"
-        raise ValueError(msg)
-    if target in {int, float}:
-        return target(value)
-    return target(value)
 
 
 class Container:
@@ -385,7 +366,7 @@ class Container:
         if dep.env_var is not None:
             value = os.environ.get(dep.env_var)
             if value is not None:
-                kwargs[dep.name] = _coerce_env(value, dep.required_type)
+                kwargs[dep.name] = coerce(value, dep.required_type)
             elif not dep.has_default:
                 msg = (
                     f"Environment variable {dep.env_var!r} is not set"
