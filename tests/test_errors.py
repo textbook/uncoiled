@@ -73,9 +73,9 @@ class TestDependencyResolutionError:
 
     def test_failures_accessible(self) -> None:
         failure = ResolutionFailure(
-            kind=FailureKind.AMBIGUOUS,
-            message="Ambiguous.",
-            suggestion="Use a qualifier.",
+            kind=FailureKind.MISSING,
+            message="Missing.",
+            suggestion="Register it.",
             component=int,
             parameter="value",
         )
