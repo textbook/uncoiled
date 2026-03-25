@@ -58,6 +58,33 @@ class TestContainerRegistration:
         with pytest.raises(DependencyResolutionError):
             c.validate()
 
+    def test_duplicate_register_raises(self) -> None:
+        c = Container()
+        c.register(Repository)
+        with pytest.raises(ValueError, match="already exists"):
+            c.register(Repository)
+
+    def test_duplicate_register_with_replace(self) -> None:
+        class MockRepo(Repository):
+            pass
+
+        c = Container()
+        c.register(Repository)
+        c.register(MockRepo, provides=Repository, replace=True)
+        assert isinstance(c.get(Repository), MockRepo)
+
+    def test_duplicate_register_instance_raises(self) -> None:
+        c = Container()
+        c.register_instance(Repository())
+        with pytest.raises(ValueError, match="already exists"):
+            c.register_instance(Repository())
+
+    def test_duplicate_register_factory_raises(self) -> None:
+        c = Container()
+        c.register_factory(Repository, return_type=Repository)
+        with pytest.raises(ValueError, match="already exists"):
+            c.register_factory(Repository, return_type=Repository)
+
     def test_register_rejects_invalid_init_method(self) -> None:
         c = Container()
         with pytest.raises(ValueError, match=r"init_method.*nonexistent.*Repository"):
@@ -611,7 +638,7 @@ class TestContainerFork:
         c = Container()
         c.register(Repository)
         child = c.fork()
-        child.register(MockRepo, provides=Repository)
+        child.register(MockRepo, provides=Repository, replace=True)
         assert isinstance(child.get(Repository), MockRepo)
         assert not isinstance(c.get(Repository), MockRepo)
 

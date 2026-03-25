@@ -52,11 +52,13 @@ class Container:
         provides: type | None = None,
         init_method: str | None = None,
         destroy_method: str | None = None,
+        replace: bool = False,
     ) -> None:
         """Register a class as a component."""
         self._check_scope(scope)
         provides = provides or cls
         key = (provides, qualifier)
+        self._check_duplicate(key, replace=replace)
         self._registrations[key] = ComponentNode(
             impl=cls,
             provides=provides,
@@ -78,10 +80,12 @@ class Container:
         type_: type | None = None,
         qualifier: str | None = None,
         destroy_method: str | None = None,
+        replace: bool = False,
     ) -> None:
         """Register a pre-constructed instance."""
         type_ = type_ or type(instance)
         key = (type_, qualifier)
+        self._check_duplicate(key, replace=replace)
         self._registrations[key] = ComponentNode(
             impl=type_,
             provides=type_,
@@ -101,10 +105,12 @@ class Container:
         qualifier: str | None = None,
         init_method: str | None = None,
         destroy_method: str | None = None,
+        replace: bool = False,
     ) -> None:
         """Register a factory callable for a type."""
         self._check_scope(scope)
         key = (return_type, qualifier)
+        self._check_duplicate(key, replace=replace)
         node = ComponentNode(
             impl=return_type,
             provides=return_type,
@@ -166,7 +172,8 @@ class Container:
 
     def _scan_module(self, mod: ModuleType) -> None:
         """Scan a single module and its submodules for components."""
-        self._register_from_module(mod)
+        seen: set[type] = set()
+        self._register_from_module(mod, seen)
 
         if hasattr(mod, "__path__"):
             for _importer, modname, _ispkg in pkgutil.walk_packages(
@@ -174,13 +181,20 @@ class Container:
                 prefix=mod.__name__ + ".",
             ):
                 submod = importlib.import_module(modname)
-                self._register_from_module(submod)
+                self._register_from_module(submod, seen)
 
-    def _register_from_module(self, mod: ModuleType) -> None:
+    def _register_from_module(
+        self,
+        mod: ModuleType,
+        seen: set[type],
+    ) -> None:
         """Register all ``@component``-decorated classes found in a module."""
         for _name, obj in inspect.getmembers(mod, inspect.isclass):
+            if obj in seen:
+                continue
             meta: ComponentMetadata | None = getattr(obj, "__uncoiled__", None)
             if meta is not None:
+                seen.add(obj)
                 self.register(
                     obj,
                     scope=meta.scope,
@@ -380,9 +394,19 @@ class Container:
 
         # Install the replacement
         if isinstance(replacement, type):
-            self.register(replacement, provides=type_, qualifier=qualifier)
+            self.register(
+                replacement,
+                provides=type_,
+                qualifier=qualifier,
+                replace=True,
+            )
         else:
-            self.register_instance(replacement, type_=type_, qualifier=qualifier)
+            self.register_instance(
+                replacement,
+                type_=type_,
+                qualifier=qualifier,
+                replace=True,
+            )
 
         try:
             yield
@@ -418,6 +442,21 @@ class Container:
         """Raise if the named method does not exist on the class."""
         if not hasattr(target, method_name):
             msg = f"{kind} '{method_name}' does not exist on {target.__name__}"
+            raise ValueError(msg)
+
+    def _check_duplicate(
+        self,
+        key: tuple[type, str | None],
+        *,
+        replace: bool,
+    ) -> None:
+        """Raise if a registration already exists and replace is not set."""
+        if not replace and key in self._registrations:
+            type_, qualifier = key
+            msg = f"A registration for {type_.__name__} already exists"
+            if qualifier:
+                msg += f" with qualifier '{qualifier}'"
+            msg += "; pass replace=True to override"
             raise ValueError(msg)
 
     def _check_scope(self, scope: Scope) -> None:
