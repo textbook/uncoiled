@@ -108,6 +108,15 @@ class TestDotEnvSource:
         source = DotEnvSource(str(p))
         assert source.get("mix") == "\"value'"
 
+    def test_mismatched_quotes_reversed_not_stripped(
+        self,
+        tmp_path: pathlib.Path,
+    ) -> None:
+        p = tmp_path / ".env"
+        p.write_text("MIX='value\"\n")
+        source = DotEnvSource(str(p))
+        assert source.get("mix") == "'value\""
+
     def test_unquoted_value_with_quotes_inside(self, tmp_path: pathlib.Path) -> None:
         p = tmp_path / ".env"
         p.write_text("MSG=it's fine\n")
