@@ -85,7 +85,13 @@ def bind_config[T](cls: type[T], source: ConfigSource) -> T:
         key = f"{prefix}.{field.name}" if prefix else field.name
         raw = source.get(normalise(key))
         if raw is not None:
-            kwargs[field.name] = _coerce(raw, hints[field.name])
+            try:
+                kwargs[field.name] = _coerce(raw, hints[field.name])
+            except (ValueError, TypeError) as exc:
+                target = hints[field.name]
+                type_name = getattr(target, "__name__", str(target))
+                msg = f"Cannot coerce config key '{key}' value {raw!r} to {type_name}"
+                raise ValueError(msg) from exc
         elif (
             field.default is not dataclasses.MISSING
             or field.default_factory is not dataclasses.MISSING
