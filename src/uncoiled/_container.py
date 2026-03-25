@@ -41,6 +41,7 @@ class Container:
             Scope.REQUEST: RequestScope(),
         }
         self._instances: list[tuple[object, type, str | None]] = []
+        self._generators: list[object] = []
         self._destroy_hooks: dict[tuple[type, str | None], str | None] = {}
         self._init_hooks: dict[tuple[type, str | None], str | None] = {}
         self._started = False
@@ -255,7 +256,14 @@ class Container:
                 call_destroy(instance, destroy_method)
             except Exception as exc:  # noqa: BLE001
                 errors.append(exc)
+        for gen in reversed(self._generators):
+            try:
+                with contextlib.suppress(StopIteration):
+                    next(gen)
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
         self._instances.clear()
+        self._generators.clear()
         for scope_manager in self._scopes.values():
             scope_manager.clear()
         self._started = False
@@ -272,7 +280,18 @@ class Container:
                 await async_call_destroy(instance, destroy_method)
             except Exception as exc:  # noqa: BLE001
                 errors.append(exc)
+        for gen in reversed(self._generators):
+            try:
+                if inspect.isasyncgen(gen):
+                    with contextlib.suppress(StopAsyncIteration):
+                        await gen.__anext__()
+                else:
+                    with contextlib.suppress(StopIteration):
+                        next(gen)
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
         self._instances.clear()
+        self._generators.clear()
         for scope_manager in self._scopes.values():
             scope_manager.clear()
         self._started = False
@@ -340,7 +359,7 @@ class Container:
             if cached is not None:
                 return cached
 
-        instance = self._create_instance(node)
+        instance = await self._acreate_instance(node)
 
         if scope_manager:
             scope_manager.put(type_, instance, qualifier)
@@ -366,7 +385,45 @@ class Container:
             self._resolve_dependency(dep, kwargs)
 
         if node.factory is not None:
-            return node.factory(**kwargs)  # ty: ignore[call-non-callable]
+            result = node.factory(**kwargs)  # ty: ignore[call-non-callable]
+            if inspect.isgenerator(result):
+                instance = next(result)
+                self._generators.append(result)
+                return instance
+            if inspect.isasyncgen(result):
+                msg = (
+                    "Async generator factories are not supported in "
+                    "synchronous resolution — use astart() and aclose()"
+                )
+                raise TypeError(msg)
+            return result
+
+        return node.impl(**kwargs)
+
+    async def _acreate_instance(self, node: ComponentNode) -> object:
+        """Create an instance from a ComponentNode (async)."""
+        if node.factory is _REQUEST_VALUE_SENTINEL:
+            msg = (
+                f"Request value for {node.provides.__name__} was not provided "
+                f"in the current request context"
+            )
+            raise LookupError(msg)
+
+        kwargs: dict[str, object] = {}
+        for dep in node.dependencies:
+            self._resolve_dependency(dep, kwargs)
+
+        if node.factory is not None:
+            result = node.factory(**kwargs)  # ty: ignore[call-non-callable]
+            if inspect.isasyncgen(result):
+                instance = await result.__anext__()
+                self._generators.append(result)
+                return instance
+            if inspect.isgenerator(result):
+                instance = next(result)
+                self._generators.append(result)
+                return instance
+            return result
 
         return node.impl(**kwargs)
 
