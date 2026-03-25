@@ -99,9 +99,19 @@ class RequestScopeMiddleware:
                 if self._request_values:
                     request = Request(scope, receive, send)
                     for rv in self._request_values:
+                        try:
+                            value = rv.extractor(request)
+                        except Exception as exc:
+                            msg = (
+                                "Failed to extract request value"
+                                f" for {rv.type_.__name__}"
+                            )
+                            if rv.qualifier:
+                                msg += f" with qualifier '{rv.qualifier}'"
+                            raise ValueError(msg) from exc
                         self._container.provide_request_value(
                             rv.type_,
-                            rv.extractor(request),
+                            value,
                             qualifier=rv.qualifier,
                         )
                 await self._app(scope, receive, send)

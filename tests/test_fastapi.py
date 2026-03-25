@@ -204,6 +204,73 @@ class TestRequestValueProvider:
         assert resp.json() == {"cid": "req-42"}
 
     @pytest.mark.anyio
+    async def test_extractor_error_includes_context(self) -> None:
+        providers = [
+            RequestValueProvider(
+                _TenantId,
+                lambda r: _TenantId(r.headers["x-nonexistent"]),
+            ),
+        ]
+        c = Container()
+        app = FastAPI()
+        app.add_middleware(
+            RequestScopeMiddleware,  # ty: ignore[invalid-argument-type]
+            container=c,
+            request_values=providers,
+        )
+        configure_container(app, c, request_values=providers)
+
+        @app.get("/")
+        def index(
+            ctr: Annotated[Container, Depends(_get_ctr)],
+        ) -> dict:
+            return {"tenant": ctr.get(_TenantId)}
+
+        with pytest.raises(ValueError, match="_TenantId"):
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(
+                    app=app,
+                    raise_app_exceptions=True,
+                ),
+                base_url="http://test",
+            ) as client:
+                await client.get("/")
+
+    @pytest.mark.anyio
+    async def test_extractor_error_includes_qualifier(self) -> None:
+        providers = [
+            RequestValueProvider(
+                str,
+                lambda r: r.headers["x-nonexistent"],
+                qualifier="my_qual",
+            ),
+        ]
+        c = Container()
+        app = FastAPI()
+        app.add_middleware(
+            RequestScopeMiddleware,  # ty: ignore[invalid-argument-type]
+            container=c,
+            request_values=providers,
+        )
+        configure_container(app, c)
+
+        @app.get("/")
+        def index(
+            ctr: Annotated[Container, Depends(_get_ctr)],
+        ) -> dict:
+            return {"val": ctr.get(str, qualifier="my_qual")}
+
+        with pytest.raises(ValueError, match="my_qual"):
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(
+                    app=app,
+                    raise_app_exceptions=True,
+                ),
+                base_url="http://test",
+            ) as client:
+                await client.get("/")
+
+    @pytest.mark.anyio
     async def test_concurrent_requests_isolated(self) -> None:
         providers = [
             RequestValueProvider(
