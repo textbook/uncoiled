@@ -59,9 +59,9 @@ class Container:
             Scope.TRANSIENT: TransientScope(),
             Scope.REQUEST: RequestScope(),
         }
-        self._instances: list[object] = []
-        self._destroy_hooks: dict[type, str | None] = {}
-        self._init_hooks: dict[type, str | None] = {}
+        self._instances: list[tuple[object, type, str | None]] = []
+        self._destroy_hooks: dict[tuple[type, str | None], str | None] = {}
+        self._init_hooks: dict[tuple[type, str | None], str | None] = {}
         self._started = False
 
     def register(  # noqa: PLR0913
@@ -89,10 +89,10 @@ class Container:
         self._registrations[key].dependencies = inspect_dependencies(cls)
         if init_method:
             self._check_lifecycle_method(cls, init_method, "init_method")
-            self._init_hooks[cls] = init_method
+            self._init_hooks[(cls, qualifier)] = init_method
         if destroy_method:
             self._check_lifecycle_method(cls, destroy_method, "destroy_method")
-            self._destroy_hooks[cls] = destroy_method
+            self._destroy_hooks[(cls, qualifier)] = destroy_method
 
     def register_instance(
         self,
@@ -113,9 +113,9 @@ class Container:
             qualifier=qualifier,
         )
         self._scopes[Scope.SINGLETON].put(type_, instance, qualifier)
-        self._instances.append(instance)
+        self._instances.append((instance, type_, qualifier))
         if destroy_method:
-            self._destroy_hooks[type_] = destroy_method
+            self._destroy_hooks[(type_, qualifier)] = destroy_method
 
     def register_factory(  # noqa: PLR0913
         self,
@@ -142,9 +142,9 @@ class Container:
         node.dependencies = inspect_dependencies(factory)
         self._registrations[key] = node
         if init_method:
-            self._init_hooks[return_type] = init_method
+            self._init_hooks[(return_type, qualifier)] = init_method
         if destroy_method:
-            self._destroy_hooks[return_type] = destroy_method
+            self._destroy_hooks[(return_type, qualifier)] = destroy_method
 
     def register_request_value(
         self,
@@ -254,9 +254,9 @@ class Container:
     def close(self) -> None:
         """Destroy instances in reverse creation order."""
         errors: list[Exception] = []
-        for instance in reversed(self._instances):
+        for instance, impl, qualifier in reversed(self._instances):
             try:
-                destroy_method = self._destroy_hooks.get(type(instance))
+                destroy_method = self._destroy_hooks.get((impl, qualifier))
                 call_destroy(instance, destroy_method)
             except Exception as exc:  # noqa: BLE001
                 errors.append(exc)
@@ -271,9 +271,9 @@ class Container:
     async def aclose(self) -> None:
         """Destroy instances in reverse creation order (async)."""
         errors: list[Exception] = []
-        for instance in reversed(self._instances):
+        for instance, impl, qualifier in reversed(self._instances):
             try:
-                destroy_method = self._destroy_hooks.get(type(instance))
+                destroy_method = self._destroy_hooks.get((impl, qualifier))
                 await async_call_destroy(instance, destroy_method)
             except Exception as exc:  # noqa: BLE001
                 errors.append(exc)
@@ -322,9 +322,10 @@ class Container:
         if scope_manager:
             scope_manager.put(type_, instance, qualifier)
 
-        if node.scope is not Scope.TRANSIENT or node.impl in self._destroy_hooks:
-            self._instances.append(instance)
-        call_init(instance, self._init_hooks.get(node.impl))
+        hook_key = (node.impl, qualifier)
+        if node.scope is not Scope.TRANSIENT or hook_key in self._destroy_hooks:
+            self._instances.append((instance, node.impl, qualifier))
+        call_init(instance, self._init_hooks.get(hook_key))
 
         return instance  # ty: ignore[invalid-return-type]
 
@@ -349,9 +350,10 @@ class Container:
         if scope_manager:
             scope_manager.put(type_, instance, qualifier)
 
-        if node.scope is not Scope.TRANSIENT or node.impl in self._destroy_hooks:
-            self._instances.append(instance)
-        await async_call_init(instance, self._init_hooks.get(node.impl))
+        hook_key = (node.impl, qualifier)
+        if node.scope is not Scope.TRANSIENT or hook_key in self._destroy_hooks:
+            self._instances.append((instance, node.impl, qualifier))
+        await async_call_init(instance, self._init_hooks.get(hook_key))
 
         return instance  # ty: ignore[invalid-return-type]
 
