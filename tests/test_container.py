@@ -1182,6 +1182,59 @@ class TestGetAllQualifierFiltering:
         assert first is second
 
 
+class TestGeneratorFactory:
+    def test_sync_generator_factory_yields_instance(self) -> None:
+        cleanup_ran = False
+
+        def factory() -> Repository:  # ty: ignore[invalid-return-type]
+            yield Repository()
+            nonlocal cleanup_ran
+            cleanup_ran = True
+
+        c = Container()
+        c.register_factory(factory, return_type=Repository)
+        c.start()
+        assert isinstance(c.get(Repository), Repository)
+        c.close()
+        assert cleanup_ran
+
+    def test_sync_generator_with_dependencies(self) -> None:
+        def factory(repo: Repository) -> UserService:  # ty: ignore[invalid-return-type]
+            yield UserService(repo)
+
+        c = Container()
+        c.register(Repository)
+        c.register_factory(factory, return_type=UserService)
+        c.start()
+        svc = c.get(UserService)
+        assert isinstance(svc.repo, Repository)
+
+    @pytest.mark.anyio
+    async def test_async_generator_factory_yields_instance(self) -> None:
+        cleanup_ran = False
+
+        async def factory() -> Repository:  # ty: ignore[invalid-return-type]
+            yield Repository()
+            nonlocal cleanup_ran
+            cleanup_ran = True
+
+        c = Container()
+        c.register_factory(factory, return_type=Repository)
+        await c.astart()
+        assert isinstance(c.get(Repository), Repository)
+        await c.aclose()
+        assert cleanup_ran
+
+    def test_async_generator_in_sync_resolution_raises(self) -> None:
+        async def factory() -> Repository:  # ty: ignore[invalid-return-type]
+            yield Repository()
+
+        c = Container()
+        c.register_factory(factory, return_type=Repository)
+        with pytest.raises(TypeError, match="Async generator"):
+            c.start()
+
+
 class TestVisualise:
     def test_empty_container(self) -> None:
         c = Container()
