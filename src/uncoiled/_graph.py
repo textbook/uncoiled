@@ -52,7 +52,7 @@ def build_graph(
         for dep in node.dependencies:
             dep_key = _type_key(dep.required_type, dep.qualifier)
 
-            if dep.is_list:
+            if dep.is_list or dep.env_var is not None:
                 continue
 
             if dep_key not in registrations:

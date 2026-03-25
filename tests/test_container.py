@@ -4,7 +4,14 @@ from typing import Annotated
 
 import pytest
 
-from uncoiled import Container, DependencyResolutionError, Qualifier, Scope, component
+from uncoiled import (
+    Container,
+    DependencyResolutionError,
+    EnvVar,
+    Qualifier,
+    Scope,
+    component,
+)
 
 
 class Repository:
@@ -257,6 +264,94 @@ class TestContainerResolution:
         results = c.get_all(Repository)
         assert len(results) == 1
         assert isinstance(results[0], SpecialRepo)
+
+
+class TestEnvVar:
+    def test_injects_env_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("TEST_DB_URL", "postgres://localhost/test")
+
+        class Service:
+            def __init__(
+                self,
+                db_url: Annotated[str, EnvVar("TEST_DB_URL")],
+            ) -> None:
+                self.db_url = db_url
+
+        c = Container()
+        c.register(Service)
+        assert c.get(Service).db_url == "postgres://localhost/test"
+
+    def test_falls_back_to_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("TEST_DB_URL", raising=False)
+
+        class Service:
+            def __init__(
+                self,
+                db_url: Annotated[str, EnvVar("TEST_DB_URL")] = ":memory:",
+            ) -> None:
+                self.db_url = db_url
+
+        c = Container()
+        c.register(Service)
+        assert c.get(Service).db_url == ":memory:"
+
+    def test_raises_when_missing_no_default(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.delenv("TEST_REQUIRED", raising=False)
+
+        class Service:
+            def __init__(
+                self,
+                val: Annotated[str, EnvVar("TEST_REQUIRED")],
+            ) -> None:
+                self.val = val
+
+        c = Container()
+        c.register(Service)
+        with pytest.raises(LookupError, match="TEST_REQUIRED"):
+            c.get(Service)
+
+    def test_coerces_int(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("TEST_PORT", "8080")
+
+        class Service:
+            def __init__(
+                self,
+                port: Annotated[int, EnvVar("TEST_PORT")],
+            ) -> None:
+                self.port = port
+
+        c = Container()
+        c.register(Service)
+        assert c.get(Service).port == 8080
+
+    def test_coerces_bool(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("TEST_DEBUG", "true")
+
+        class Service:
+            def __init__(
+                self,
+                debug: Annotated[bool, EnvVar("TEST_DEBUG")],
+            ) -> None:
+                self.debug = debug
+
+        c = Container()
+        c.register(Service)
+        assert c.get(Service).debug is True
+
+    def test_graph_validation_passes(self) -> None:
+        class Service:
+            def __init__(
+                self,
+                db_url: Annotated[str, EnvVar("DB_URL")] = ":memory:",
+            ) -> None:
+                self.db_url = db_url
+
+        c = Container()
+        c.register(Service)
+        c.validate()  # should not raise
 
 
 class TestContainerValidation:
