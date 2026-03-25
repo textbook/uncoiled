@@ -1180,3 +1180,64 @@ class TestGetAllQualifierFiltering:
         first = await c._aresolve(Repository)  # noqa: SLF001
         second = await c._aresolve(Repository)  # noqa: SLF001
         assert first is second
+
+
+class TestVisualise:
+    def test_empty_container(self) -> None:
+        c = Container()
+        result = c.visualise()
+        assert result.startswith("graph TD")
+
+    def test_single_component(self) -> None:
+        c = Container()
+        c.register(Repository)
+        result = c.visualise()
+        assert "Repository" in result
+
+    def test_dependency_edge(self) -> None:
+        c = Container()
+        c.register(Repository)
+        c.register(UserService)
+        result = c.visualise()
+        assert "Repository" in result
+        assert "UserService" in result
+        assert "-->" in result
+
+    def test_scope_shown_for_non_singleton(self) -> None:
+        c = Container()
+        c.register(Repository, scope=Scope.TRANSIENT)
+        result = c.visualise()
+        assert "transient" in result
+
+    def test_qualifier_shown(self) -> None:
+        class RepoA(Repository):
+            pass
+
+        c = Container()
+        c.register(RepoA, provides=Repository, qualifier="primary")
+        result = c.visualise()
+        assert "primary" in result
+
+    def test_envvar_shown(self) -> None:
+        class Service:
+            def __init__(
+                self,
+                url: Annotated[str, EnvVar("DB_URL")] = ":memory:",
+            ) -> None:
+                self.url = url
+
+        c = Container()
+        c.register(Service)
+        result = c.visualise()
+        assert "DB_URL" in result
+
+    def test_optional_uses_dashed_edge(self) -> None:
+        class OptService:
+            def __init__(self, repo: Repository | None = None) -> None:
+                self.repo = repo
+
+        c = Container()
+        c.register(Repository)
+        c.register(OptService)
+        result = c.visualise()
+        assert "-.->" in result

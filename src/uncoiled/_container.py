@@ -209,6 +209,19 @@ class Container:
         """Validate the dependency graph eagerly."""
         validate_graph(self._registrations)
 
+    def visualise(self) -> str:
+        """Render the dependency graph as a Mermaid flowchart.
+
+        Returns a string that can be embedded in Markdown::
+
+            ```mermaid
+            print(container.visualise())
+            ```
+        """
+        from ._visualise import render_mermaid  # noqa: PLC0415
+
+        return render_mermaid(self._registrations)
+
     def start(self) -> None:
         """Validate the graph and instantiate all singletons."""
         self.validate()
