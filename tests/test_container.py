@@ -1,6 +1,7 @@
 import types
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Protocol
 
 import pytest
 
@@ -91,6 +92,50 @@ class TestContainerRegistration:
         c.register_factory(Repository, return_type=Repository)
         with pytest.raises(ValueError, match="already exists"):
             c.register_factory(Repository, return_type=Repository)
+
+    def test_register_incompatible_provides_raises(self) -> None:
+        c = Container()
+        with pytest.raises(TypeError, match="not a subclass"):
+            c.register(str, provides=int)
+
+    def test_register_compatible_provides_passes(self) -> None:
+        class Sub(Repository):
+            pass
+
+        c = Container()
+        c.register(Sub, provides=Repository)
+        assert isinstance(c.get(Repository), Sub)
+
+    def test_register_provides_protocol_skips_check(self) -> None:
+        class MyProtocol(Protocol):
+            def do_thing(self) -> None: ...
+
+        class Impl:
+            def do_thing(self) -> None: ...
+
+        c = Container()
+        c.register(Impl, provides=MyProtocol)
+
+    def test_register_provides_abc_validates(self) -> None:
+        class Base(ABC):
+            @abstractmethod
+            def do_thing(self) -> None: ...
+
+        class Impl(Base):
+            def do_thing(self) -> None: ...
+
+        c = Container()
+        c.register(Impl, provides=Base)
+        assert isinstance(c.get(Base), Impl)
+
+    def test_register_provides_abc_rejects_incompatible(self) -> None:
+        class Base(ABC):
+            @abstractmethod
+            def do_thing(self) -> None: ...
+
+        c = Container()
+        with pytest.raises(TypeError, match="not a subclass"):
+            c.register(str, provides=Base)
 
     def test_register_rejects_invalid_init_method(self) -> None:
         c = Container()
@@ -521,13 +566,13 @@ class TestContainerLifecycle:
         assert res.closed
 
     def test_qualified_init_methods_are_independent(self) -> None:
-        class ServiceA:
+        class ServiceA(Repository):
             started = False
 
             def boot(self) -> None:
                 self.started = True
 
-        class ServiceB:
+        class ServiceB(Repository):
             started = False
 
             def setup(self) -> None:
@@ -553,13 +598,13 @@ class TestContainerLifecycle:
         assert b.started  # ty: ignore[unresolved-attribute]
 
     def test_qualified_destroy_methods_are_independent(self) -> None:
-        class ResourceA:
+        class ResourceA(Repository):
             closed = False
 
             def teardown(self) -> None:
                 self.closed = True
 
-        class ResourceB:
+        class ResourceB(Repository):
             closed = False
 
             def cleanup(self) -> None:

@@ -78,6 +78,7 @@ class Container:
         """Register a class as a component."""
         self._check_scope(scope)
         provides = provides or cls
+        self._check_provides(cls, provides)
         key = (provides, qualifier)
         self._check_duplicate(key, replace=replace)
         self._registrations[key] = ComponentNode(
@@ -491,6 +492,19 @@ class Container:
                 msg += f" with qualifier '{qualifier}'"
             msg += "; pass replace=True to override"
             raise ValueError(msg)
+
+    @staticmethod
+    def _check_provides(impl: type, provides: type) -> None:
+        """Raise if *impl* is not a subclass of *provides*."""
+        if provides is impl:
+            return
+        try:
+            is_sub = issubclass(impl, provides)
+        except TypeError:
+            return
+        if not is_sub:
+            msg = f"{impl.__name__} is not a subclass of {provides.__name__}"
+            raise TypeError(msg)
 
     def _check_scope(self, scope: Scope) -> None:
         """Raise if the scope has no registered manager."""
