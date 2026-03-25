@@ -15,6 +15,7 @@ from ._config._sources import (
     YamlSource,
 )
 from ._container import Container
+from ._envvar import EnvVar
 from ._errors import DependencyResolutionError, FailureKind, ResolutionFailure
 from ._graph import ComponentNode, build_graph, validate_graph
 from ._inspection import DependencySpec, inspect_dependencies
@@ -37,6 +38,7 @@ __all__ = [
     "Disposable",
     "DotEnvSource",
     "EnvSource",
+    "EnvVar",
     "Factory",
     "FailureKind",
     "Inject",

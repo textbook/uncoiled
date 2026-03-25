@@ -7,6 +7,7 @@ import types
 from dataclasses import dataclass
 from typing import Annotated, Union, get_args, get_origin
 
+from ._envvar import EnvVar
 from ._qualifiers import Qualifier
 
 _OPTIONAL_UNION_ARGS = 2
@@ -22,6 +23,7 @@ class DependencySpec:
     is_list: bool = False
     qualifier: str | None = None
     has_default: bool = False
+    env_var: str | None = None
 
 
 def _is_optional_union(annotation: object) -> type | None:
@@ -73,6 +75,36 @@ def inspect_dependencies(target: object) -> list[DependencySpec]:
     return specs
 
 
+def _resolve_annotated(
+    name: str,
+    args: tuple[object, ...],
+    *,
+    has_default: bool,
+) -> DependencySpec | None:
+    """Resolve an ``Annotated[T, ...]`` annotation."""
+    inner = args[0]
+    qualifier = None
+    env_var = None
+    for meta in args[1:]:
+        if isinstance(meta, Qualifier) and qualifier is None:
+            qualifier = meta.name
+        elif isinstance(meta, EnvVar) and env_var is None:
+            env_var = meta.name
+    if env_var is not None:
+        return DependencySpec(
+            name=name,
+            required_type=inner if isinstance(inner, type) else type(inner),
+            has_default=has_default,
+            env_var=env_var,
+        )
+    return _resolve_annotation_with_qualifier(
+        name,
+        inner,
+        qualifier=qualifier,
+        has_default=has_default,
+    )
+
+
 def _resolve_annotation(
     name: str,
     annotation: object,
@@ -83,17 +115,9 @@ def _resolve_annotation(
     origin = get_origin(annotation)
 
     if origin is Annotated:
-        args = get_args(annotation)
-        inner = args[0]
-        qualifier = None
-        for meta in args[1:]:
-            if isinstance(meta, Qualifier):
-                qualifier = meta.name
-                break
-        return _resolve_annotation_with_qualifier(
+        return _resolve_annotated(
             name,
-            inner,
-            qualifier=qualifier,
+            get_args(annotation),
             has_default=has_default,
         )
 
