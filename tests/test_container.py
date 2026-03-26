@@ -13,6 +13,7 @@ from uncoiled import (
     Qualifier,
     Scope,
     component,
+    factory,
 )
 
 
@@ -1397,3 +1398,185 @@ class TestVisualise:
         from mermaid import Mermaid  # noqa: PLC0415
 
         Mermaid(result)  # raises MermaidError on invalid syntax
+
+
+class TestScanFactoryFunctions:
+    def test_scan_finds_decorated_function(self) -> None:
+        @factory
+        def create_repo() -> Repository:
+            return Repository()
+
+        mod = types.ModuleType("test_scan_fn")
+        mod.create_repo = create_repo  # ty: ignore[unresolved-attribute]
+
+        c = Container()
+        c.scan(mod)
+        assert isinstance(c.get(Repository), Repository)
+
+    def test_scan_factory_resolves_dependencies(self) -> None:
+        @factory
+        def make_service(repo: Repository) -> UserService:
+            return UserService(repo)
+
+        mod = types.ModuleType("test_scan_fn_deps")
+        mod.make_service = make_service  # ty: ignore[unresolved-attribute]
+
+        c = Container()
+        c.register(Repository)
+        c.scan(mod)
+        svc = c.get(UserService)
+        assert isinstance(svc, UserService)
+        assert isinstance(svc.repo, Repository)
+
+    def test_scan_factory_explicit_provides(self) -> None:
+        class Base:
+            pass
+
+        class Impl(Base):
+            pass
+
+        @factory(provides=Base)
+        def create_impl() -> Impl:
+            return Impl()
+
+        mod = types.ModuleType("test_scan_fn_provides")
+        mod.create_impl = create_impl  # ty: ignore[unresolved-attribute]
+
+        c = Container()
+        c.scan(mod)
+        assert isinstance(c.get(Base), Impl)
+
+    def test_scan_factory_with_scope(self) -> None:
+        @factory(scope=Scope.TRANSIENT)
+        def create_repo() -> Repository:
+            return Repository()
+
+        mod = types.ModuleType("test_scan_fn_scope")
+        mod.create_repo = create_repo  # ty: ignore[unresolved-attribute]
+
+        c = Container()
+        c.scan(mod)
+        r1 = c.get(Repository)
+        r2 = c.get(Repository)
+        assert r1 is not r2
+
+    def test_scan_factory_with_qualifier(self) -> None:
+        @factory(qualifier="primary")
+        def create_repo() -> Repository:
+            return Repository()
+
+        mod = types.ModuleType("test_scan_fn_qual")
+        mod.create_repo = create_repo  # ty: ignore[unresolved-attribute]
+
+        c = Container()
+        c.scan(mod)
+        assert isinstance(c.get(Repository, qualifier="primary"), Repository)
+
+    def test_scan_raises_for_factory_without_return_type(self) -> None:
+        @factory
+        def create():  # noqa: ANN202
+            return Repository()
+
+        mod = types.ModuleType("test_scan_fn_no_ret")
+        mod.create = create  # ty: ignore[unresolved-attribute]
+
+        c = Container()
+        with pytest.raises(TypeError, match="return type annotation"):
+            c.scan(mod)
+
+    def test_scan_factory_validates_dependencies(self) -> None:
+        @factory
+        def make_service(repo: Repository) -> UserService:
+            return UserService(repo)
+
+        mod = types.ModuleType("test_scan_fn_validate")
+        mod.make_service = make_service  # ty: ignore[unresolved-attribute]
+
+        c = Container()
+        c.scan(mod)
+        with pytest.raises(DependencyResolutionError):
+            c.validate()
+
+
+class TestScanFactoryClassmethods:
+    def test_scan_finds_factory_classmethod(self) -> None:
+        class RepoFactory:
+            @factory
+            @classmethod
+            def create(cls) -> Repository:
+                return Repository()
+
+        mod = types.ModuleType("test_scan_cm")
+        mod.RepoFactory = RepoFactory  # ty: ignore[unresolved-attribute]
+
+        c = Container()
+        c.scan(mod)
+        assert isinstance(c.get(Repository), Repository)
+
+    def test_scan_classmethod_other_ordering(self) -> None:
+        class RepoFactory:
+            @classmethod
+            @factory
+            def create(cls) -> Repository:
+                return Repository()
+
+        mod = types.ModuleType("test_scan_cm_order")
+        mod.RepoFactory = RepoFactory  # ty: ignore[unresolved-attribute]
+
+        c = Container()
+        c.scan(mod)
+        assert isinstance(c.get(Repository), Repository)
+
+    def test_scan_classmethod_resolves_dependencies(self) -> None:
+        class ServiceFactory:
+            @factory
+            @classmethod
+            def create(cls, repo: Repository) -> UserService:
+                return UserService(repo)
+
+        mod = types.ModuleType("test_scan_cm_deps")
+        mod.ServiceFactory = ServiceFactory  # ty: ignore[unresolved-attribute]
+
+        c = Container()
+        c.register(Repository)
+        c.scan(mod)
+        svc = c.get(UserService)
+        assert isinstance(svc, UserService)
+        assert isinstance(svc.repo, Repository)
+
+    def test_scan_classmethod_with_provides(self) -> None:
+        class Base:
+            pass
+
+        class Impl(Base):
+            @factory(provides=Base)
+            @classmethod
+            def create(cls) -> Base:
+                return Impl()
+
+        mod = types.ModuleType("test_scan_cm_provides")
+        mod.Impl = Impl  # ty: ignore[unresolved-attribute]
+
+        c = Container()
+        c.scan(mod)
+        assert isinstance(c.get(Base), Impl)
+
+    def test_class_component_and_classmethod_factory_coexist(self) -> None:
+        @component
+        class Impl:
+            pass
+
+        class ImplFactory:
+            @factory(qualifier="custom")
+            @classmethod
+            def create(cls) -> Impl:
+                return Impl()
+
+        mod = types.ModuleType("test_scan_coexist")
+        mod.Impl = Impl  # ty: ignore[unresolved-attribute]
+        mod.ImplFactory = ImplFactory  # ty: ignore[unresolved-attribute]
+
+        c = Container()
+        c.scan(mod)
+        assert isinstance(c.get(Impl), Impl)
+        assert isinstance(c.get(Impl, qualifier="custom"), Impl)

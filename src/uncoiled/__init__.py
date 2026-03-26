@@ -2,7 +2,7 @@
 
 from importlib import metadata
 
-from ._component import ComponentMetadata, component
+from ._component import ComponentMetadata, component, factory
 from ._config._binding import bind_config, config_properties
 from ._config._profiles import get_active_profiles
 from ._config._relaxed import normalise
@@ -59,6 +59,7 @@ __all__ = [
     "call_init",
     "component",
     "config_properties",
+    "factory",
     "get_active_profiles",
     "inspect_dependencies",
     "normalise",
