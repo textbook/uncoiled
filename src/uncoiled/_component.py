@@ -22,6 +22,25 @@ class ComponentMetadata:
     provides: type | None = None
 
 
+def _attach(target: object, meta: ComponentMetadata) -> object:
+    """Attach metadata to any decorator target (class, function, or classmethod)."""
+    if isinstance(target, classmethod):
+        target.__func__.__uncoiled__ = meta  # ty: ignore[unresolved-attribute]
+    else:
+        target.__uncoiled__ = meta  # ty: ignore[invalid-assignment]
+    return target
+
+
+class _Decorator:
+    """Callable returned by ``@component(...)`` or ``@factory(...)`` with arguments."""
+
+    def __init__(self, meta: ComponentMetadata) -> None:
+        self._meta = meta
+
+    def __call__(self, target: object) -> object:
+        return _attach(target, self._meta)
+
+
 # region @component — marks a class for constructor injection
 
 
@@ -35,7 +54,7 @@ def component(
     scope: Scope = ...,
     qualifier: str | None = ...,
     provides: type | None = ...,
-) -> _ComponentDecorator: ...
+) -> _Decorator: ...
 
 
 def component(
@@ -45,7 +64,7 @@ def component(
     scope: Scope = Scope.SINGLETON,
     qualifier: str | None = None,
     provides: type | None = None,
-) -> type | _ComponentDecorator:
+) -> type | _Decorator:
     """Mark a class as a DI-managed component.
 
     Can be used with or without arguments::
@@ -65,38 +84,15 @@ def component(
     meta = ComponentMetadata(scope=scope, qualifier=qualifier, provides=provides)
 
     if cls is not None:
-        cls.__uncoiled__ = meta  # ty: ignore[unresolved-attribute]
+        _attach(cls, meta)
         return cls
 
-    return _ComponentDecorator(meta)
-
-
-class _ComponentDecorator:
-    """Callable returned by ``@component(...)`` with arguments."""
-
-    def __init__(self, meta: ComponentMetadata) -> None:
-        self._meta = meta
-
-    def __call__(self, cls: type) -> type:
-        cls.__uncoiled__ = self._meta  # ty: ignore[unresolved-attribute]
-        return cls
+    return _Decorator(meta)
 
 
 # endregion
 
 # region @factory — marks a function or classmethod as a DI-managed factory
-
-
-def _apply_factory_metadata(
-    target: _FactoryTarget,
-    meta: ComponentMetadata,
-) -> _FactoryTarget:
-    """Attach metadata to a factory function or classmethod descriptor."""
-    if isinstance(target, classmethod):
-        target.__func__.__uncoiled__ = meta  # ty: ignore[unresolved-attribute]
-    else:
-        target.__uncoiled__ = meta  # ty: ignore[invalid-assignment]
-    return target
 
 
 @overload
@@ -109,7 +105,7 @@ def factory(
     scope: Scope = ...,
     qualifier: str | None = ...,
     provides: type | None = ...,
-) -> _FactoryDecorator: ...
+) -> _Decorator: ...
 
 
 def factory(
@@ -119,7 +115,7 @@ def factory(
     scope: Scope = Scope.SINGLETON,
     qualifier: str | None = None,
     provides: type | None = None,
-) -> _FactoryTarget | _FactoryDecorator:
+) -> _FactoryTarget | _Decorator:
     """Mark a function or classmethod as a DI-managed factory.
 
     Can be used with or without arguments::
@@ -144,19 +140,10 @@ def factory(
     meta = ComponentMetadata(scope=scope, qualifier=qualifier, provides=provides)
 
     if target is not None:
-        return _apply_factory_metadata(target, meta)
+        _attach(target, meta)
+        return target
 
-    return _FactoryDecorator(meta)
-
-
-class _FactoryDecorator:
-    """Callable returned by ``@factory(...)`` with arguments."""
-
-    def __init__(self, meta: ComponentMetadata) -> None:
-        self._meta = meta
-
-    def __call__(self, target: _FactoryTarget) -> _FactoryTarget:
-        return _apply_factory_metadata(target, self._meta)
+    return _Decorator(meta)
 
 
 # endregion

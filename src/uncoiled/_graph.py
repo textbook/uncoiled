@@ -23,10 +23,6 @@ class ComponentNode:
     factory: object | None = None
 
 
-def _type_key(typ: type, qualifier: str | None = None) -> tuple[type, str | None]:
-    return (typ, qualifier)
-
-
 def build_graph(
     registrations: dict[tuple[type, str | None], ComponentNode],
 ) -> list[ResolutionFailure]:
@@ -36,10 +32,6 @@ def build_graph(
     Collects all failures rather than stopping at the first.
     """
     failures: list[ResolutionFailure] = []
-
-    all_providers: dict[type, list[ComponentNode]] = defaultdict(list)
-    for node in registrations.values():
-        all_providers[node.provides].append(node)
 
     adj: dict[tuple[type, str | None], set[tuple[type, str | None]]] = defaultdict(set)
     in_degree: dict[tuple[type, str | None], int] = {}
@@ -51,7 +43,7 @@ def build_graph(
         target = node.factory if node.factory is not None else node.impl
         node.dependencies = inspect_dependencies(target)
         for dep in node.dependencies:
-            dep_key = _type_key(dep.required_type, dep.qualifier)
+            dep_key = (dep.required_type, dep.qualifier)
 
             if (
                 dep.is_list
