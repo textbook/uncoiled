@@ -22,9 +22,7 @@ class ComponentMetadata:
     provides: type | None = None
 
 
-# ---------------------------------------------------------------------------
-# @component — marks a class for constructor injection
-# ---------------------------------------------------------------------------
+# region @component — marks a class for constructor injection
 
 
 @overload
@@ -84,9 +82,9 @@ class _ComponentDecorator:
         return cls
 
 
-# ---------------------------------------------------------------------------
-# @factory — marks a function or classmethod as a DI-managed factory
-# ---------------------------------------------------------------------------
+# endregion
+
+# region @factory — marks a function or classmethod as a DI-managed factory
 
 
 def _apply_factory_metadata(
@@ -159,3 +157,6 @@ class _FactoryDecorator:
 
     def __call__(self, target: _FactoryTarget) -> _FactoryTarget:
         return _apply_factory_metadata(target, self._meta)
+
+
+# endregion
