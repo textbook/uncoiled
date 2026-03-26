@@ -15,9 +15,9 @@ class SqliteUserRepository:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
 
-    @factory(provides=UserRepository)
     @classmethod
-    def create(cls, config: DbConfig) -> SqliteUserRepository:
+    @factory
+    def create(cls, config: DbConfig) -> UserRepository:
         """Build from config — connects to SQLite and ensures schema."""
         conn = sqlite3.connect(config.url, check_same_thread=False)
         conn.execute(
