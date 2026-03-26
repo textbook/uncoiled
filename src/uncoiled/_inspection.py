@@ -112,43 +112,19 @@ def _resolve_annotation(
     has_default: bool,
 ) -> DependencySpec | None:
     """Resolve a single annotation into a DependencySpec."""
-    origin = get_origin(annotation)
-
-    if origin is Annotated:
+    if get_origin(annotation) is Annotated:
         return _resolve_annotated(
             name,
             get_args(annotation),
             has_default=has_default,
         )
 
-    if origin is list:
-        args = get_args(annotation)
-        if args:
-            return DependencySpec(
-                name=name,
-                required_type=args[0],
-                is_list=True,
-                has_default=has_default,
-            )
-        return None
-
-    inner = _is_optional_union(annotation)
-    if inner is not None:
-        return DependencySpec(
-            name=name,
-            required_type=inner,
-            optional=True,
-            has_default=has_default,
-        )
-
-    if isinstance(annotation, type):
-        return DependencySpec(
-            name=name,
-            required_type=annotation,
-            has_default=has_default,
-        )
-
-    return None
+    return _resolve_annotation_with_qualifier(
+        name,
+        annotation,
+        qualifier=None,
+        has_default=has_default,
+    )
 
 
 def _resolve_annotation_with_qualifier(

@@ -61,11 +61,9 @@ def bind_config[T](cls: type[T], source: ConfigSource) -> T:
                 msg = f"Cannot coerce config key '{key}' value {raw!r} to {type_name}"
                 raise ValueError(msg) from exc
         elif (
-            field.default is not dataclasses.MISSING
-            or field.default_factory is not dataclasses.MISSING
+            field.default is dataclasses.MISSING
+            and field.default_factory is dataclasses.MISSING
         ):
-            pass  # Let the dataclass use its default
-        else:
             msg = f"Missing required config value for '{key}'"
             raise ValueError(msg)
 
