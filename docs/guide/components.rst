@@ -27,6 +27,19 @@ dependencies:
        def __init__(self, config: DbConfig) -> None:
            ...
 
+Dataclasses work naturally as components --- their generated ``__init__`` is
+introspected like any other:
+
+.. code-block:: python
+
+   from dataclasses import dataclass
+
+   @component(scope=Scope.REQUEST)
+   @dataclass
+   class UserController:
+       repo: UserRepository
+       tenant: TenantId
+
 Options:
 
 - ``scope`` --- lifecycle scope (default: ``Scope.SINGLETON``)
