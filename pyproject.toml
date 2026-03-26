@@ -29,6 +29,11 @@ lint = [
     "ruff>=0.15.6",
     "ty>=0.0.23",
 ]
+docs = [
+    "furo>=2024.8.6",
+    "sphinx>=8.0",
+    "sphinx-copybutton>=0.5",
+]
 mutation = [
     "cosmic-ray>=8.4.4",
     "tqdm>=4.67.3",
@@ -79,4 +84,7 @@ ignore = [
     "D",
     "PLR2004",
     "S101",
+]
+"docs/**" = [
+    "INP001",
 ]

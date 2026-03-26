@@ -6,6 +6,9 @@ dist/
 wheels/
 *.egg-info
 
+# Docs build
+docs/_build/
+
 # Testing data
 coverage/
 mutation/
