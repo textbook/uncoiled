@@ -6,24 +6,26 @@ import sqlite3
 
 from example.config import DbConfig  # noqa: TC001 — injected at runtime
 from example.domain import User, UserRepository
-from uncoiled import Scope, component
+from uncoiled import factory
 
 
-@component(provides=UserRepository, scope=Scope.SINGLETON)
 class SqliteUserRepository:
-    """SQLite-backed implementation of ``UserRepository``.
+    """SQLite-backed implementation of ``UserRepository``."""
 
-    Receives ``DbConfig`` via constructor injection — the container
-    auto-wires it from the registered config instance.
-    """
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self._conn = conn
 
-    def __init__(self, config: DbConfig) -> None:
-        self._conn = sqlite3.connect(config.url, check_same_thread=False)
-        self._conn.execute(
+    @factory(provides=UserRepository)
+    @classmethod
+    def create(cls, config: DbConfig) -> SqliteUserRepository:
+        """Build from config — connects to SQLite and ensures schema."""
+        conn = sqlite3.connect(config.url, check_same_thread=False)
+        conn.execute(
             "CREATE TABLE IF NOT EXISTS users "
             "(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT)",
         )
-        self._conn.commit()
+        conn.commit()
+        return cls(conn)
 
     def find_by_id(self, user_id: int) -> User | None:
         """Look up a user by ID."""

@@ -18,7 +18,7 @@ from ._scope import RequestScope, SingletonScope, TransientScope
 from ._types import Scope
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
     from types import ModuleType
 
     from ._component import ComponentMetadata
@@ -26,6 +26,20 @@ if TYPE_CHECKING:
 
 
 _REQUEST_VALUE_SENTINEL = object()
+
+
+def _infer_return_type(fn: Callable[..., object]) -> type:
+    """Infer the provided type from a factory's return annotation."""
+    hints = inspect.get_annotations(fn, eval_str=True)
+    ret = hints.get("return")
+    if ret is None or not isinstance(ret, type):
+        name = getattr(fn, "__name__", repr(fn))
+        msg = (
+            f"@factory-decorated callable '{name}' must have a return type "
+            f"annotation or explicit provides="
+        )
+        raise TypeError(msg)
+    return ret
 
 
 class Container:
@@ -170,14 +184,14 @@ class Container:
         self._scopes[Scope.REQUEST].put(type_, value, qualifier)
 
     def scan(self, *modules: str | ModuleType) -> None:
-        """Scan modules for ``@component``-decorated classes and register them."""
+        """Scan modules for ``@component`` classes and ``@factory`` callables."""
         for module in modules:
             mod = importlib.import_module(module) if isinstance(module, str) else module
             self._scan_module(mod)
 
     def _scan_module(self, mod: ModuleType) -> None:
         """Scan a single module and its submodules for components."""
-        seen: set[type] = set()
+        seen: set[object] = set()
         self._register_from_module(mod, seen)
 
         if hasattr(mod, "__path__"):
@@ -191,9 +205,9 @@ class Container:
     def _register_from_module(
         self,
         mod: ModuleType,
-        seen: set[type],
+        seen: set[object],
     ) -> None:
-        """Register all ``@component``-decorated classes found in a module."""
+        """Register ``@component`` classes and ``@factory`` callables."""
         for _name, obj in inspect.getmembers(mod, inspect.isclass):
             if obj in seen:
                 continue
@@ -205,6 +219,50 @@ class Container:
                     scope=meta.scope,
                     qualifier=meta.qualifier,
                     provides=meta.provides,
+                )
+            self._register_factory_classmethods(obj, seen)
+
+        for _name, obj in inspect.getmembers(mod, inspect.isfunction):
+            if obj in seen:
+                continue
+            meta = getattr(obj, "__uncoiled__", None)
+            if meta is not None:
+                seen.add(obj)
+                return_type = meta.provides or _infer_return_type(obj)
+                self.register_factory(
+                    obj,
+                    return_type=return_type,
+                    scope=meta.scope,
+                    qualifier=meta.qualifier,
+                )
+
+    def _register_factory_classmethods(
+        self,
+        cls: type,
+        seen: set[object],
+    ) -> None:
+        """Discover and register ``@factory``-decorated classmethods on *cls*."""
+        for attr_name in cls.__dict__:
+            attr = cls.__dict__[attr_name]
+            if not isinstance(attr, classmethod):
+                continue
+            fn = attr.__func__
+            if fn in seen:
+                continue
+            meta: ComponentMetadata | None = getattr(
+                fn,
+                "__uncoiled__",
+                None,
+            )
+            if meta is not None:
+                seen.add(fn)
+                bound = getattr(cls, attr_name)
+                return_type = meta.provides or _infer_return_type(fn)
+                self.register_factory(
+                    bound,
+                    return_type=return_type,
+                    scope=meta.scope,
+                    qualifier=meta.qualifier,
                 )
 
     def validate(self) -> None:
