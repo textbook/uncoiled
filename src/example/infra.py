@@ -15,8 +15,8 @@ class SqliteUserRepository:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
 
-    @classmethod
     @factory
+    @classmethod
     def create(cls, config: DbConfig) -> UserRepository:
         """Build from config — connects to SQLite and ensures schema."""
         conn = sqlite3.connect(config.url, check_same_thread=False)
@@ -49,4 +49,4 @@ class SqliteUserRepository:
             (user.name, user.email),
         )
         self._conn.commit()
-        return User(id=cursor.lastrowid, name=user.name, email=user.email)  # ty: ignore[invalid-argument-type]
+        return User(id=cursor.lastrowid, name=user.name, email=user.email)  # type: ignore[arg-type]  # lastrowid is set after INSERT
