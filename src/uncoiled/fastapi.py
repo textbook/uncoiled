@@ -22,6 +22,7 @@ from ._container import Container  # noqa: TC001 — used at runtime in Depends(
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable, Sequence
 
+    from fastapi import FastAPI
     from starlette.types import ASGIApp, Receive, Scope, Send
 
 
@@ -119,16 +120,16 @@ def uncoiled_lifespan(
     """
 
     @contextlib.asynccontextmanager
-    async def _lifespan(app: object) -> AsyncIterator[None]:
+    async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         existing: Container | None = getattr(
-            getattr(app, "state", None),
+            app.state,
             "uncoiled_container",
             None,
         )
         if existing is not None:
             yield
             return
-        app.state.uncoiled_container = container  # ty: ignore[unresolved-attribute]
+        app.state.uncoiled_container = container
         container.start()
         try:
             yield
@@ -139,7 +140,7 @@ def uncoiled_lifespan(
 
 
 def configure_container(
-    app: object,
+    app: FastAPI,
     container: Container,
     request_values: Sequence[RequestValueProvider] = (),
 ) -> None:
@@ -151,5 +152,5 @@ def configure_container(
     """
     for rv in request_values:
         container.register_request_value(rv.type_, qualifier=rv.qualifier)
-    app.state.uncoiled_container = container  # ty: ignore[unresolved-attribute]
+    app.state.uncoiled_container = container
     container.start()

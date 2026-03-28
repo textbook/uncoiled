@@ -44,7 +44,7 @@ def inspect_dependencies(target: object) -> list[DependencySpec]:
     function signature directly.
     """
     if isinstance(target, type):
-        func = target.__init__
+        func = target.__init__  # type: ignore[misc]
     elif callable(target):
         func = target
     else:

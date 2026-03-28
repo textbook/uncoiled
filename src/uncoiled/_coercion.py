@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 _BOOL_TRUE = frozenset({"1", "on", "true", "yes"})
 _BOOL_FALSE = frozenset({"0", "false", "no", "off"})
@@ -19,7 +23,7 @@ def _parse_bool(value: str) -> bool:
     raise ValueError(msg)
 
 
-_COERCIONS: dict[type, object] = {
+_COERCIONS: dict[type, Callable[[str], object]] = {
     str: str,
     int: int,
     float: float,
@@ -45,7 +49,7 @@ def coerce(value: str, target: type) -> object:
 
     coercer = _COERCIONS.get(target)
     if coercer is not None:
-        return coercer(value)  # ty: ignore[call-non-callable]
+        return coercer(value)
 
     msg = f"Unsupported coercion target type: {target}"
     raise ValueError(msg)

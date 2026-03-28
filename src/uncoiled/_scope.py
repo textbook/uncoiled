@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
 from ._types import Scope
 
@@ -51,7 +51,7 @@ class SingletonScope:
 
     def get[T](self, key: type[T], qualifier: str | None = None) -> T | None:
         """Return the cached instance or None."""
-        return self._instances.get((key, qualifier))  # ty: ignore[invalid-return-type]
+        return cast("T | None", self._instances.get((key, qualifier)))
 
     def put[T](self, key: type[T], instance: T, qualifier: str | None = None) -> None:
         """Cache the instance."""
@@ -119,7 +119,7 @@ class RequestScope:
         instances = self._var.get(None)
         if instances is None:
             return None
-        return instances.get((key, qualifier))  # ty: ignore[invalid-return-type]
+        return cast("T | None", instances.get((key, qualifier)))
 
     def put[T](self, key: type[T], instance: T, qualifier: str | None = None) -> None:
         """Cache the instance in the current request context."""
