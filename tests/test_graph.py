@@ -333,6 +333,231 @@ class TestScopeMismatch:
         assert build_graph(registrations) == []
 
 
+class SingletonDep:
+    pass
+
+
+class TransientDep:
+    pass
+
+
+class AutoNeedsSingleton:
+    def __init__(self, dep: SingletonDep) -> None:
+        self.dep = dep
+
+
+class AutoNeedsRequest:
+    def __init__(self, dep: RequestDep) -> None:
+        self.dep = dep
+
+
+class AutoNeedsTransient:
+    def __init__(self, dep: TransientDep) -> None:
+        self.dep = dep
+
+
+class AutoNeedsMixed:
+    def __init__(self, s: SingletonDep, r: RequestDep, t: TransientDep) -> None:
+        self.s = s
+        self.r = r
+        self.t = t
+
+
+class AutoNeedsAutoRequest:
+    def __init__(self, dep: AutoNeedsRequest) -> None:
+        self.dep = dep
+
+
+class AutoNeedsAutoSingleton:
+    def __init__(self, dep: AutoNeedsSingleton) -> None:
+        self.dep = dep
+
+
+class AutoCycleA:
+    def __init__(self, dep: AutoCycleB) -> None:
+        self.dep = dep
+
+
+class AutoCycleB:
+    def __init__(self, dep: AutoCycleA) -> None:
+        self.dep = dep
+
+
+class AutoNoDeps:
+    pass
+
+
+class TestAutoScope:
+    def test_auto_with_no_deps_resolves_to_singleton(self) -> None:
+        registrations = _make_registrations(
+            ComponentNode(impl=AutoNoDeps, provides=AutoNoDeps, scope=Scope.AUTO),
+        )
+        assert build_graph(registrations) == []
+        assert registrations[(AutoNoDeps, None)].scope is Scope.SINGLETON
+
+    def test_auto_with_singleton_dep_resolves_to_singleton(self) -> None:
+        registrations = _make_registrations(
+            ComponentNode(impl=SingletonDep, provides=SingletonDep),
+            ComponentNode(
+                impl=AutoNeedsSingleton,
+                provides=AutoNeedsSingleton,
+                scope=Scope.AUTO,
+            ),
+        )
+        assert build_graph(registrations) == []
+        assert registrations[(AutoNeedsSingleton, None)].scope is Scope.SINGLETON
+
+    def test_auto_with_request_dep_resolves_to_request(self) -> None:
+        registrations = _make_registrations(
+            ComponentNode(
+                impl=RequestDep,
+                provides=RequestDep,
+                scope=Scope.REQUEST,
+            ),
+            ComponentNode(
+                impl=AutoNeedsRequest,
+                provides=AutoNeedsRequest,
+                scope=Scope.AUTO,
+            ),
+        )
+        assert build_graph(registrations) == []
+        assert registrations[(AutoNeedsRequest, None)].scope is Scope.REQUEST
+
+    def test_auto_with_transient_dep_resolves_to_singleton(self) -> None:
+        registrations = _make_registrations(
+            ComponentNode(
+                impl=TransientDep,
+                provides=TransientDep,
+                scope=Scope.TRANSIENT,
+            ),
+            ComponentNode(
+                impl=AutoNeedsTransient,
+                provides=AutoNeedsTransient,
+                scope=Scope.AUTO,
+            ),
+        )
+        assert build_graph(registrations) == []
+        assert registrations[(AutoNeedsTransient, None)].scope is Scope.SINGLETON
+
+    def test_auto_with_mixed_deps_picks_request(self) -> None:
+        registrations = _make_registrations(
+            ComponentNode(impl=SingletonDep, provides=SingletonDep),
+            ComponentNode(
+                impl=RequestDep,
+                provides=RequestDep,
+                scope=Scope.REQUEST,
+            ),
+            ComponentNode(
+                impl=TransientDep,
+                provides=TransientDep,
+                scope=Scope.TRANSIENT,
+            ),
+            ComponentNode(
+                impl=AutoNeedsMixed,
+                provides=AutoNeedsMixed,
+                scope=Scope.AUTO,
+            ),
+        )
+        assert build_graph(registrations) == []
+        assert registrations[(AutoNeedsMixed, None)].scope is Scope.REQUEST
+
+    def test_transitive_auto_chain_propagates_request(self) -> None:
+        registrations = _make_registrations(
+            ComponentNode(
+                impl=RequestDep,
+                provides=RequestDep,
+                scope=Scope.REQUEST,
+            ),
+            ComponentNode(
+                impl=AutoNeedsRequest,
+                provides=AutoNeedsRequest,
+                scope=Scope.AUTO,
+            ),
+            ComponentNode(
+                impl=AutoNeedsAutoRequest,
+                provides=AutoNeedsAutoRequest,
+                scope=Scope.AUTO,
+            ),
+        )
+        assert build_graph(registrations) == []
+        assert registrations[(AutoNeedsRequest, None)].scope is Scope.REQUEST
+        assert registrations[(AutoNeedsAutoRequest, None)].scope is Scope.REQUEST
+
+    def test_transitive_auto_chain_all_singletons(self) -> None:
+        registrations = _make_registrations(
+            ComponentNode(impl=SingletonDep, provides=SingletonDep),
+            ComponentNode(
+                impl=AutoNeedsSingleton,
+                provides=AutoNeedsSingleton,
+                scope=Scope.AUTO,
+            ),
+            ComponentNode(
+                impl=AutoNeedsAutoSingleton,
+                provides=AutoNeedsAutoSingleton,
+                scope=Scope.AUTO,
+            ),
+        )
+        assert build_graph(registrations) == []
+        assert registrations[(AutoNeedsSingleton, None)].scope is Scope.SINGLETON
+        assert registrations[(AutoNeedsAutoSingleton, None)].scope is Scope.SINGLETON
+
+    def test_auto_cycle_produces_failure(self) -> None:
+        registrations = _make_registrations(
+            ComponentNode(
+                impl=AutoCycleA,
+                provides=AutoCycleA,
+                scope=Scope.AUTO,
+            ),
+            ComponentNode(
+                impl=AutoCycleB,
+                provides=AutoCycleB,
+                scope=Scope.AUTO,
+            ),
+        )
+        failures = build_graph(registrations)
+        auto_failures = [f for f in failures if f.kind is FailureKind.AUTO_CYCLE]
+        assert len(auto_failures) == 1
+        assert "AutoCycleA" in auto_failures[0].message
+        assert "AutoCycleB" in auto_failures[0].message
+
+    def test_explicit_scope_not_overridden(self) -> None:
+        """Explicit SINGLETON depending on REQUEST still fails (not auto-resolved)."""
+        registrations = _make_registrations(
+            ComponentNode(
+                impl=RequestDep,
+                provides=RequestDep,
+                scope=Scope.REQUEST,
+            ),
+            ComponentNode(
+                impl=SingletonNeedsRequest,
+                provides=SingletonNeedsRequest,
+                scope=Scope.SINGLETON,
+            ),
+        )
+        failures = build_graph(registrations)
+        assert any(f.kind is FailureKind.SCOPE_MISMATCH for f in failures)
+
+    def test_auto_factory(self) -> None:
+        def create_service(dep: RequestDep) -> AutoNeedsRequest:
+            return AutoNeedsRequest(dep)
+
+        registrations = _make_registrations(
+            ComponentNode(
+                impl=RequestDep,
+                provides=RequestDep,
+                scope=Scope.REQUEST,
+            ),
+            ComponentNode(
+                impl=AutoNeedsRequest,
+                provides=AutoNeedsRequest,
+                scope=Scope.AUTO,
+                factory=create_service,
+            ),
+        )
+        assert build_graph(registrations) == []
+        assert registrations[(AutoNeedsRequest, None)].scope is Scope.REQUEST
+
+
 class TestValidateGraph:
     def test_raises_on_failure(self) -> None:
         registrations = _make_registrations(

@@ -636,6 +636,8 @@ class Container:
 
     def _check_scope(self, scope: Scope) -> None:
         """Raise if the scope has no registered manager."""
+        if scope is Scope.AUTO:
+            return  # resolved to a concrete scope during validate/start
         if scope not in self._scopes:
             msg = f"No scope manager registered for {scope.value!r}"
             raise ValueError(msg)

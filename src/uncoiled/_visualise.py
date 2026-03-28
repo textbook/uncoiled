@@ -88,6 +88,7 @@ def render_mermaid(
     lines.append(f"    classDef {_scope_class(Scope.SINGLETON)} fill:#4a9,stroke:#333")
     lines.append(f"    classDef {_scope_class(Scope.TRANSIENT)} fill:#f96,stroke:#333")
     lines.append(f"    classDef {_scope_class(Scope.REQUEST)} fill:#69f,stroke:#333")
+    lines.append(f"    classDef {_scope_class(Scope.AUTO)} fill:#ccc,stroke:#333")
     lines.append("    classDef env_var fill:#ff9,stroke:#333")
 
     return "\n".join(lines)

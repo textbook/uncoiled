@@ -1580,3 +1580,59 @@ class TestScanFactoryClassmethods:
         c.scan(mod)
         assert isinstance(c.get(Impl), Impl)
         assert isinstance(c.get(Impl, qualifier="custom"), Impl)
+
+
+class AutoCycleX:
+    def __init__(self, dep: "AutoCycleY") -> None:
+        self.dep = dep
+
+
+class AutoCycleY:
+    def __init__(self, dep: AutoCycleX) -> None:
+        self.dep = dep
+
+
+class TestAutoScope:
+    def test_auto_resolves_to_singleton(self) -> None:
+        c = Container()
+        c.register(Repository, scope=Scope.AUTO)
+        c.start()
+        first = c.get(Repository)
+        second = c.get(Repository)
+        assert first is second
+
+    def test_auto_resolves_to_request_when_dep_is_request(self) -> None:
+        class TenantId:
+            pass
+
+        class Controller:
+            def __init__(self, tenant: TenantId) -> None:
+                self.tenant = tenant
+
+        c = Container()
+        c.register_request_value(TenantId)
+        c.register(Controller, scope=Scope.AUTO)
+        c.start()
+        with c.request_context():
+            c.provide_request_value(TenantId, TenantId())
+            ctrl = c.get(Controller)
+            assert isinstance(ctrl, Controller)
+
+    def test_auto_factory(self) -> None:
+        c = Container()
+        c.register(Repository)
+        c.register_factory(
+            UserService,
+            return_type=UserService,
+            scope=Scope.AUTO,
+        )
+        c.start()
+        svc = c.get(UserService)
+        assert isinstance(svc, UserService)
+
+    def test_auto_cycle_raises(self) -> None:
+        c = Container()
+        c.register(AutoCycleX, scope=Scope.AUTO)
+        c.register(AutoCycleY, scope=Scope.AUTO)
+        with pytest.raises(DependencyResolutionError, match="AUTO"):
+            c.validate()

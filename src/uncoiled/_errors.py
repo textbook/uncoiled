@@ -12,6 +12,7 @@ class FailureKind(enum.Enum):
     MISSING = "missing"
     CIRCULAR = "circular"
     SCOPE_MISMATCH = "scope_mismatch"
+    AUTO_CYCLE = "auto_cycle"
 
 
 @dataclass(frozen=True)
