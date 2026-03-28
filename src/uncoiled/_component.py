@@ -37,8 +37,9 @@ class _Decorator:
     def __init__(self, meta: ComponentMetadata) -> None:
         self._meta = meta
 
-    def __call__(self, target: object) -> object:
-        return _attach(target, self._meta)
+    def __call__[T](self, target: T) -> T:
+        _attach(target, self._meta)
+        return target
 
 
 # region @component — marks a class for constructor injection
