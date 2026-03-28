@@ -27,6 +27,92 @@ class ComponentNode:
     factory: Callable[..., object] | None = None
 
 
+def _collect_auto_deps(
+    registrations: dict[tuple[type, str | None], ComponentNode],
+    auto_keys: set[tuple[type, str | None]],
+) -> dict[tuple[type, str | None], list[tuple[type, str | None]]]:
+    """Pre-compute registered dependency keys for each AUTO node."""
+    auto_deps: dict[tuple[type, str | None], list[tuple[type, str | None]]] = {}
+    for key in auto_keys:
+        node = registrations[key]
+        target = node.factory if node.factory is not None else node.impl
+        node.dependencies = inspect_dependencies(target)
+        auto_deps[key] = [
+            (dep.required_type, dep.qualifier)
+            for dep in node.dependencies
+            if not dep.is_list
+            and dep.env_var is None
+            and (dep.required_type, dep.qualifier) in registrations
+        ]
+    return auto_deps
+
+
+def _infer_scope(
+    dep_keys: list[tuple[type, str | None]],
+    registrations: dict[tuple[type, str | None], ComponentNode],
+    resolved: set[tuple[type, str | None]],
+) -> tuple[Scope, bool]:
+    """Infer the scope for an AUTO node from its dependencies.
+
+    Returns (inferred_scope, has_unresolved_auto_deps).
+    """
+    has_unresolved = False
+    for dk in dep_keys:
+        dep_scope = registrations[dk].scope
+        if dep_scope is Scope.AUTO and dk not in resolved:
+            has_unresolved = True
+        elif dep_scope is Scope.REQUEST:
+            return Scope.REQUEST, False
+    return Scope.SINGLETON, has_unresolved
+
+
+def _resolve_auto_scopes(
+    registrations: dict[tuple[type, str | None], ComponentNode],
+) -> list[ResolutionFailure]:
+    """Resolve AUTO-scoped components to concrete scopes via fixed-point iteration."""
+    auto_keys = {key for key, node in registrations.items() if node.scope is Scope.AUTO}
+    if not auto_keys:
+        return []
+
+    auto_deps = _collect_auto_deps(registrations, auto_keys)
+
+    resolved: set[tuple[type, str | None]] = set()
+    changed = True
+    while changed:
+        changed = False
+        for key in auto_keys - resolved:
+            inferred, has_unresolved = _infer_scope(
+                auto_deps[key],
+                registrations,
+                resolved,
+            )
+            if inferred is Scope.REQUEST or not has_unresolved:
+                registrations[key].scope = inferred
+                resolved.add(key)
+                changed = True
+
+    # Any remaining AUTO nodes form a cycle among themselves.
+    unresolved = auto_keys - resolved
+    if not unresolved:
+        return []
+    for key in unresolved:
+        registrations[key].scope = Scope.SINGLETON
+    names = sorted(registrations[k].impl.__name__ for k in unresolved)
+    return [
+        ResolutionFailure(
+            kind=FailureKind.AUTO_CYCLE,
+            message=(
+                f"Cannot infer scope for components with mutual AUTO "
+                f"dependencies: {', '.join(names)}."
+            ),
+            suggestion=(
+                "Set an explicit scope (Scope.SINGLETON or Scope.REQUEST) "
+                "on at least one component in the cycle."
+            ),
+        ),
+    ]
+
+
 def build_graph(
     registrations: dict[tuple[type, str | None], ComponentNode],
 ) -> list[ResolutionFailure]:
@@ -36,6 +122,7 @@ def build_graph(
     Collects all failures rather than stopping at the first.
     """
     failures: list[ResolutionFailure] = []
+    failures.extend(_resolve_auto_scopes(registrations))
 
     adj: dict[tuple[type, str | None], set[tuple[type, str | None]]] = defaultdict(set)
     in_degree: dict[tuple[type, str | None], int] = {}

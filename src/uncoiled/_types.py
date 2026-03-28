@@ -15,6 +15,7 @@ class Scope(enum.Enum):
     SINGLETON = "singleton"
     TRANSIENT = "transient"
     REQUEST = "request"
+    AUTO = "auto"
 
 
 type Factory[T] = Callable[..., T]
