@@ -8,7 +8,7 @@ import inspect
 import logging
 import os
 import pkgutil
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self, cast
 
 from ._coercion import coerce
 from ._graph import ComponentNode, validate_graph
@@ -18,14 +18,17 @@ from ._scope import RequestScope, SingletonScope, TransientScope
 from ._types import Scope
 
 if TYPE_CHECKING:
+    import types
     from collections.abc import Callable, Iterator
     from types import ModuleType
 
     from ._component import ComponentMetadata
     from ._scope import ScopeManager
 
+    _Generator = types.GeneratorType[Any, Any, Any] | types.AsyncGeneratorType[Any, Any]
 
-_REQUEST_VALUE_SENTINEL = object()
+
+_REQUEST_VALUE_SENTINEL: Callable[..., object] = cast("Callable[..., object]", object())
 
 
 def _infer_return_type(fn: Callable[..., object]) -> type:
@@ -56,7 +59,7 @@ class Container:
             Scope.REQUEST: RequestScope(),
         }
         self._instances: list[tuple[object, type, str | None]] = []
-        self._generators: list[object] = []
+        self._generators: list[_Generator] = []
         self._destroy_hooks: dict[tuple[type, str | None], str | None] = {}
         self._init_hooks: dict[tuple[type, str | None], str | None] = {}
         self._started = False
@@ -117,7 +120,7 @@ class Container:
 
     def register_factory(  # noqa: PLR0913
         self,
-        factory: object,
+        factory: Callable[..., object],
         *,
         return_type: type,
         scope: Scope = Scope.SINGLETON,
@@ -222,15 +225,15 @@ class Container:
                 )
             self._register_factory_classmethods(obj, seen)
 
-        for _name, obj in inspect.getmembers(mod, inspect.isfunction):
-            if obj in seen:
+        for _name, fn in inspect.getmembers(mod, inspect.isfunction):
+            if fn in seen:
                 continue
-            meta = getattr(obj, "__uncoiled__", None)
+            meta = getattr(fn, "__uncoiled__", None)
             if meta is not None:
-                seen.add(obj)
-                return_type = meta.provides or _infer_return_type(obj)
+                seen.add(fn)
+                return_type = meta.provides or _infer_return_type(fn)
                 self.register_factory(
-                    obj,
+                    fn,
                     return_type=return_type,
                     scope=meta.scope,
                     qualifier=meta.qualifier,
@@ -386,7 +389,7 @@ class Container:
             self._instances.append((instance, node.impl, qualifier))
         call_init(instance, self._init_hooks.get(hook_key))
 
-        return instance  # ty: ignore[invalid-return-type]
+        return cast("T", instance)
 
     async def _aresolve[T](self, type_: type[T], qualifier: str | None = None) -> T:
         """Resolve a type from the container (async)."""
@@ -414,7 +417,7 @@ class Container:
             self._instances.append((instance, node.impl, qualifier))
         await async_call_init(instance, self._init_hooks.get(hook_key))
 
-        return instance  # ty: ignore[invalid-return-type]
+        return cast("T", instance)
 
     def _create_instance(self, node: ComponentNode) -> object:
         """Create an instance from a ComponentNode."""
@@ -430,7 +433,7 @@ class Container:
             self._resolve_dependency(dep, kwargs, node=node)
 
         if node.factory is not None:
-            result = node.factory(**kwargs)  # ty: ignore[call-non-callable]
+            result = node.factory(**kwargs)
             if inspect.isgenerator(result):
                 instance = next(result)
                 self._generators.append(result)
@@ -459,7 +462,7 @@ class Container:
             self._resolve_dependency(dep, kwargs, node=node)
 
         if node.factory is not None:
-            result = node.factory(**kwargs)  # ty: ignore[call-non-callable]
+            result = node.factory(**kwargs)
             if inspect.isasyncgen(result):
                 instance = await result.__anext__()
                 self._generators.append(result)
@@ -563,8 +566,8 @@ class Container:
 
     def request_context(self) -> contextlib.AbstractContextManager[None]:
         """Enter a new request scope context."""
-        scope = self._scopes[Scope.REQUEST]
-        return scope.context()  # ty: ignore[unresolved-attribute]
+        scope = cast("RequestScope", self._scopes[Scope.REQUEST])
+        return scope.context()
 
     def fork(self) -> Container:
         """Create a child container with shared registrations."""
@@ -614,7 +617,7 @@ class Container:
         for gen in reversed(self._generators):
             try:
                 with contextlib.suppress(StopIteration):
-                    next(gen)  # ty: ignore[invalid-argument-type]
+                    next(gen)  # type: ignore[arg-type]
             except Exception as exc:  # noqa: BLE001
                 errors.append(exc)
 
@@ -627,7 +630,7 @@ class Container:
                         await gen.__anext__()
                 else:
                     with contextlib.suppress(StopIteration):
-                        next(gen)  # ty: ignore[invalid-argument-type]
+                        next(gen)  # type: ignore[arg-type]
             except Exception as exc:  # noqa: BLE001
                 errors.append(exc)
 

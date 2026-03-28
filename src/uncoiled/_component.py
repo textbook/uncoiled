@@ -25,9 +25,9 @@ class ComponentMetadata:
 def _attach(target: object, meta: ComponentMetadata) -> object:
     """Attach metadata to any decorator target (class, function, or classmethod)."""
     if isinstance(target, classmethod):
-        target.__func__.__uncoiled__ = meta  # ty: ignore[unresolved-attribute]
+        target.__func__.__uncoiled__ = meta  # type: ignore[attr-defined]
     else:
-        target.__uncoiled__ = meta  # ty: ignore[invalid-assignment]
+        target.__uncoiled__ = meta  # type: ignore[attr-defined]
     return target
 
 

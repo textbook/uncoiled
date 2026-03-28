@@ -5,10 +5,14 @@ from __future__ import annotations
 import logging
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from ._errors import DependencyResolutionError, FailureKind, ResolutionFailure
 from ._inspection import DependencySpec, inspect_dependencies
 from ._types import Scope
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 @dataclass
@@ -20,7 +24,7 @@ class ComponentNode:
     qualifier: str | None = None
     dependencies: list[DependencySpec] = field(default_factory=list)
     scope: Scope = Scope.SINGLETON
-    factory: object | None = None
+    factory: Callable[..., object] | None = None
 
 
 def build_graph(

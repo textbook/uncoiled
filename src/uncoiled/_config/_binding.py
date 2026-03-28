@@ -38,7 +38,7 @@ class _ConfigPropertiesDecorator:
 
     def __call__(self, cls: type) -> type:
         """Attach prefix metadata to the class."""
-        cls.__config_prefix__ = self._prefix  # ty: ignore[unresolved-attribute]
+        cls.__config_prefix__ = self._prefix  # type: ignore[attr-defined]
         return cls
 
 
@@ -46,7 +46,7 @@ def bind_config[T](cls: type[T], source: ConfigSource) -> T:
     """Create an instance of a config dataclass by reading values from a source."""
     prefix = getattr(cls, "__config_prefix__", "")
     hints = get_type_hints(cls)
-    fields = dataclasses.fields(cls)
+    fields = dataclasses.fields(cls)  # type: ignore[arg-type]
     kwargs: dict[str, object] = {}
 
     for field in fields:
