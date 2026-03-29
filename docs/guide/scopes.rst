@@ -45,6 +45,38 @@ One instance per HTTP request.  Requires
 Request-scoped values are isolated via ``contextvars``, so concurrent requests
 each get their own instance.
 
+Auto
+----
+
+Infers the scope from the dependency graph instead of requiring an explicit
+declaration.  Opt in with ``scope=Scope.AUTO``:
+
+.. code-block:: python
+
+   @component(scope=Scope.AUTO)
+   @dataclass
+   class UserController:
+       repo: UserRepository       # singleton
+       tenant: TenantId           # request-scoped
+
+Because ``TenantId`` is request-scoped, the container resolves
+``UserController`` as request-scoped --- the only valid choice.
+
+Resolution rules:
+
+- Any dependency is **request-scoped** → component becomes ``REQUEST``.
+- All dependencies are **singleton** (or transient, or none) → component
+  becomes ``SINGLETON``.
+- **Transient** dependencies are transparent --- they don't force the parent
+  to any particular scope.
+- Resolution is **transitive**: if ``A(AUTO)`` depends on ``B(AUTO)`` which
+  depends on ``C(REQUEST)``, both ``A`` and ``B`` become ``REQUEST``.
+- Mutual ``AUTO`` dependencies that cannot be resolved produce an
+  ``AUTO_CYCLE`` validation error.
+
+``Scope.AUTO`` works on both ``@component`` and ``@factory``.  The default
+scope remains ``Scope.SINGLETON`` --- ``AUTO`` is always opt-in.
+
 Scope Validation
 ----------------
 
