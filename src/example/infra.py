@@ -49,4 +49,7 @@ class SqliteUserRepository:
             (user.name, user.email),
         )
         self._conn.commit()
-        return User(id=cursor.lastrowid, name=user.name, email=user.email)  # type: ignore[arg-type]  # lastrowid is set after INSERT
+        if cursor.lastrowid is None:  # pragma: no cover
+            msg = "INSERT did not set lastrowid"
+            raise RuntimeError(msg)
+        return User(id=cursor.lastrowid, name=user.name, email=user.email)

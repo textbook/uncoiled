@@ -427,7 +427,7 @@ class Container:
             if reg_type is type_ or (
                 isinstance(reg_type, type) and issubclass(reg_type, type_)
             ):
-                results.append(cast("T", self._resolve(reg_type, qual)))
+                results.append(self._resolve(reg_type, qual))
         return results
 
     def _resolve[T](self, type_: type[T], qualifier: str | None = None) -> T:
@@ -747,7 +747,7 @@ class Container:
                         await gen.__anext__()
                 else:
                     with contextlib.suppress(StopIteration):
-                        next(gen)  # type: ignore[arg-type]
+                        next(gen)
             except Exception as exc:  # noqa: BLE001
                 errors.append(exc)
 
