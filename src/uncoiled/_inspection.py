@@ -52,8 +52,10 @@ def inspect_dependencies(target: object) -> list[DependencySpec]:
 
     try:
         hints = inspect.get_annotations(func, eval_str=True)
-    except Exception:  # noqa: BLE001
-        return []
+    except Exception as exc:
+        name = getattr(target, "__name__", repr(target))
+        msg = f"Failed to evaluate type annotations for '{name}': {exc}"
+        raise TypeError(msg) from exc
 
     sig = inspect.signature(func)
     specs: list[DependencySpec] = []

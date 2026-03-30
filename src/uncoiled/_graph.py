@@ -141,7 +141,14 @@ def build_graph(
     for key, node in registrations.items():
         if not node.dependencies:
             target = node.factory if node.factory is not None else node.impl
-            node.dependencies = inspect_dependencies(target)
+            try:
+                node.dependencies = inspect_dependencies(target)
+            except TypeError:
+                _log.warning(
+                    "Could not evaluate annotations for %s; "
+                    "dependencies will not be validated for this component",
+                    node.impl.__name__,
+                )
         for dep in node.dependencies:
             dep_key = (dep.required_type, dep.qualifier)
 
