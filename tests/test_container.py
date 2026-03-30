@@ -1,6 +1,7 @@
 import logging
 import types
 from abc import ABC, abstractmethod
+from collections.abc import AsyncGenerator, Generator
 from dataclasses import dataclass
 from typing import Annotated, Protocol
 
@@ -1323,6 +1324,61 @@ class TestGeneratorFactory:
 
         c = Container()
         c.register_factory(factory, return_type=Repository)
+        with pytest.raises(TypeError, match="Async generator"):
+            c.start()
+
+    def test_generator_return_type_unwrapped(self) -> None:
+        def factory() -> Generator[Repository, None, None]:
+            yield Repository()
+
+        c = Container()
+        c.register_factory(factory, return_type=Repository)
+        c.start()
+        assert isinstance(c.get(Repository), Repository)
+        c.close()
+
+    @pytest.mark.anyio
+    async def test_async_generator_return_type_unwrapped(self) -> None:
+        async def factory() -> AsyncGenerator[Repository, None]:
+            yield Repository()
+
+        c = Container()
+        c.register_factory(factory, return_type=Repository)
+        await c.astart()
+        assert isinstance(c.get(Repository), Repository)
+        await c.aclose()
+
+    def test_scan_infers_type_from_generator_annotation(self) -> None:
+        mod = types.ModuleType("_test_gen_factory")
+
+        @component
+        class Dep:
+            pass
+
+        @factory
+        def create_repo(dep: Dep) -> Generator[Repository, None, None]:  # noqa: ARG001
+            yield Repository()
+
+        mod.Dep = Dep  # type: ignore[attr-defined]
+        mod.create_repo = create_repo  # type: ignore[attr-defined]
+
+        c = Container()
+        c.scan(mod)
+        c.start()
+        assert isinstance(c.get(Repository), Repository)
+        c.close()
+
+    def test_scan_infers_type_from_async_generator_annotation(self) -> None:
+        mod = types.ModuleType("_test_async_gen_factory")
+
+        @factory
+        async def create_repo() -> AsyncGenerator[Repository, None]:
+            yield Repository()
+
+        mod.create_repo = create_repo  # type: ignore[attr-defined]
+
+        c = Container()
+        c.scan(mod)
         with pytest.raises(TypeError, match="Async generator"):
             c.start()
 
