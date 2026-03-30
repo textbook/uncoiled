@@ -643,6 +643,7 @@ class Container:
         child._registrations = dict(self._registrations)
         child._init_hooks = dict(self._init_hooks)
         child._destroy_hooks = dict(self._destroy_hooks)
+        child._type_index = {k: list(v) for k, v in self._type_index.items()}
         _log.debug("Forked container (%d registrations)", len(self._registrations))
         return child
 

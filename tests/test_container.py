@@ -910,6 +910,19 @@ class TestContainerFork:
         assert isinstance(child.get(Repository), MockRepo)
         assert not isinstance(c.get(Repository), MockRepo)
 
+    def test_fork_copies_type_index_for_get_all(self) -> None:
+        class Repo(Repository):
+            pass
+
+        c = Container()
+        c.register(Repo, provides=Repository)
+        c.start()
+        child = c.fork()
+        # get_all should use the indexed path, not the O(n) fallback
+        results = child.get_all(Repository)
+        assert len(results) == 1
+        assert isinstance(results[0], Repo)
+
 
 class _TenantId(str):
     __slots__ = ()
