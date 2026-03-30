@@ -65,6 +65,7 @@ class Container:
         self._destroy_hooks: dict[tuple[type, str | None], str | None] = {}
         self._init_hooks: dict[tuple[type, str | None], str | None] = {}
         self._type_index: dict[type, list[tuple[type, str | None]]] = {}
+        self._resolution_order: list[tuple[type, str | None]] = []
         self._started = False
 
     def register(  # noqa: PLR0913
@@ -291,7 +292,7 @@ class Container:
 
     def validate(self) -> None:
         """Validate the dependency graph eagerly."""
-        validate_graph(self._registrations)
+        self._resolution_order = validate_graph(self._registrations)
         self._build_type_index()
 
     def visualise(self) -> str:
@@ -313,7 +314,8 @@ class Container:
         self._check_async_generators()
         self.validate()
         singleton = self._scopes[Scope.SINGLETON]
-        for key, node in self._registrations.items():
+        for key in self._resolution_order:
+            node = self._registrations[key]
             if (
                 node.scope is Scope.SINGLETON
                 and singleton.get(node.provides, key[1]) is None
@@ -330,7 +332,8 @@ class Container:
         )
         self.validate()
         singleton = self._scopes[Scope.SINGLETON]
-        for key, node in self._registrations.items():
+        for key in self._resolution_order:
+            node = self._registrations[key]
             if (
                 node.scope is Scope.SINGLETON
                 and singleton.get(node.provides, key[1]) is None

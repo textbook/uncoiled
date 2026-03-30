@@ -129,6 +129,18 @@ def build_graph(
     Uses Kahn's algorithm for topological sort to detect cycles.
     Collects all failures rather than stopping at the first.
     """
+    failures, _order = _build_graph(registrations)
+    return failures
+
+
+def _build_graph(
+    registrations: dict[tuple[type, str | None], ComponentNode],
+) -> tuple[list[ResolutionFailure], list[tuple[type, str | None]]]:
+    """Build and validate the dependency graph.
+
+    Returns (failures, topological_order).  The topological order lists
+    dependency keys before their dependents.
+    """
     failures: list[ResolutionFailure] = []
     failures.extend(_resolve_auto_scopes(registrations))
 
@@ -213,34 +225,39 @@ def build_graph(
             adj[dep_key].add(key)
             in_degree[key] = in_degree.get(key, 0) + 1
 
-    cycle_failures = _detect_cycles(registrations, adj, in_degree)
+    cycle_failures, order = _detect_cycles(registrations, adj, in_degree)
     failures.extend(cycle_failures)
 
-    return failures
+    return failures, order
 
 
 def _detect_cycles(
     registrations: dict[tuple[type, str | None], ComponentNode],
     adj: dict[tuple[type, str | None], set[tuple[type, str | None]]],
     in_degree: dict[tuple[type, str | None], int],
-) -> list[ResolutionFailure]:
-    """Use Kahn's algorithm to detect cycles in the dependency graph."""
+) -> tuple[list[ResolutionFailure], list[tuple[type, str | None]]]:
+    """Use Kahn's algorithm to detect cycles in the dependency graph.
+
+    Returns a tuple of (failures, topological_order).  The topological order
+    lists dependency keys before their dependents so that eager instantiation
+    can resolve dependencies in the correct sequence.
+    """
     queue: deque[tuple[type, str | None]] = deque()
     for key, degree in in_degree.items():
         if degree == 0:
             queue.append(key)
 
-    visited = 0
+    order: list[tuple[type, str | None]] = []
     while queue:
         current = queue.popleft()
-        visited += 1
+        order.append(current)
         for neighbor in adj.get(current, set()):
             in_degree[neighbor] -= 1
             if in_degree[neighbor] == 0:
                 queue.append(neighbor)
 
-    if visited == len(registrations):
-        return []
+    if len(order) == len(registrations):
+        return [], order
 
     cycle_nodes = [key for key, degree in in_degree.items() if degree > 0]
     cycle_names = [registrations[key].impl.__name__ for key in cycle_nodes]
@@ -252,13 +269,18 @@ def _detect_cycles(
             message=f"Circular dependency detected: {cycle_str}.",
             suggestion=("Break the cycle by introducing an interface or factory."),
         ),
-    ]
+    ], order
 
 
 def validate_graph(
     registrations: dict[tuple[type, str | None], ComponentNode],
-) -> None:
-    """Validate the dependency graph, raising on any failures."""
-    failures = build_graph(registrations)
+) -> list[tuple[type, str | None]]:
+    """Validate the dependency graph, raising on any failures.
+
+    Returns the topological order of registration keys (dependencies before
+    dependents) so that callers can instantiate in the correct sequence.
+    """
+    failures, order = _build_graph(registrations)
     if failures:
         raise DependencyResolutionError(failures)
+    return order
