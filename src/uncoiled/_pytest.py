@@ -14,13 +14,19 @@ if TYPE_CHECKING:
 
 
 class Resolve:
-    """Function-scoped helper to resolve types from the container."""
+    """Function-scoped helper to resolve types from the container.
+
+    Supports both ``inject[MyType]`` and ``inject[MyType, "qualifier"]``.
+    """
 
     def __init__(self, container: Container) -> None:
         self._container = container
 
-    def __getitem__[T](self, key: type[T]) -> T:
-        """Resolve a type from the container."""
+    def __getitem__[T](self, key: type[T] | tuple[type[T], str]) -> T:
+        """Resolve a type from the container, with optional qualifier."""
+        if isinstance(key, tuple):
+            type_, qualifier = key
+            return self._container.get(type_, qualifier=qualifier)
         return self._container.get(key)
 
 

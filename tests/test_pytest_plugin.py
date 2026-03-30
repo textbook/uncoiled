@@ -26,6 +26,21 @@ class TestResolve:
         with pytest.raises(LookupError):
             resolve[Repository]
 
+    def test_getitem_with_qualifier(self) -> None:
+        c = Container()
+        c.register(Repository, qualifier="primary")
+        c.start()
+        resolve = Resolve(c)
+        assert isinstance(resolve[Repository, "primary"], Repository)
+
+    def test_getitem_with_qualifier_raises_for_missing(self) -> None:
+        c = Container()
+        c.register(Repository)
+        c.start()
+        resolve = Resolve(c)
+        with pytest.raises(LookupError):
+            resolve[Repository, "nonexistent"]
+
 
 class TestPluginFixtures:
     """Test plugin fixtures using pytester."""

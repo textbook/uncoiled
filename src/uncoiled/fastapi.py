@@ -49,16 +49,17 @@ class Inject:
         return Annotated[type_, inject_dependency(type_)]  # type: ignore[return-value]
 
 
-def inject_dependency[T](type_: type[T]) -> T:
+def inject_dependency[T](type_: type[T], qualifier: str | None = None) -> T:
     """Create a FastAPI ``Depends`` that resolves *type_* from the container.
 
-    Prefer ``Inject[T]`` in route signatures for brevity.
+    Pass *qualifier* to resolve a specific qualified registration.
+    Prefer ``Inject[T]`` in route signatures when no qualifier is needed.
     """
 
     def _resolve(
         container: Annotated[Container, Depends(_get_container)],
     ) -> T:
-        return container.get(type_)
+        return container.get(type_, qualifier=qualifier)
 
     return Depends(_resolve)
 
