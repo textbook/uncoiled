@@ -358,3 +358,16 @@ class TestInspectDependencies:
         assert len(specs) == 1
         assert specs[0].name == "repo"
         assert specs[0].required_type is Repository
+
+
+class TestAnnotationErrors:
+    def test_broken_annotation_raises_type_error(self) -> None:
+        """Unresolvable annotations must raise, not silently return empty."""
+
+        # A function with a string annotation referencing a nonexistent type
+        # triggers NameError inside inspect.get_annotations(eval_str=True)
+        def broken(dep: "NonExistentType") -> None:  # type: ignore[name-defined]  # noqa: F821
+            pass
+
+        with pytest.raises(TypeError, match="Failed to evaluate type annotations"):
+            inspect_dependencies(broken)
