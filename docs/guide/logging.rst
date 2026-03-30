@@ -43,3 +43,5 @@ Warnings
 A small number of conditions emit ``WARNING``-level messages:
 
 - ``DotEnvSource`` or ``YamlSource`` given a path that does not exist.
+- A ``list[T]`` dependency resolves to an empty list (no matching
+  implementations registered).
