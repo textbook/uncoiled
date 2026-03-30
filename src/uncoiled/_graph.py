@@ -11,6 +11,8 @@ from ._errors import DependencyResolutionError, FailureKind, ResolutionFailure
 from ._inspection import DependencySpec, inspect_dependencies
 from ._types import Scope
 
+_log = logging.getLogger("uncoiled")
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -90,6 +92,11 @@ def _resolve_auto_scopes(
                 registrations[key].scope = inferred
                 resolved.add(key)
                 changed = True
+                _log.debug(
+                    "AUTO scope resolved: %s -> %s",
+                    registrations[key].impl.__name__,
+                    inferred.value,
+                )
 
     # Any remaining AUTO nodes form a cycle among themselves.
     unresolved = auto_keys - resolved

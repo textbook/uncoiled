@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from ._relaxed import normalise
+
+_log = logging.getLogger("uncoiled")
 
 _MIN_QUOTED_LEN = 2
 
@@ -68,7 +71,7 @@ class DotEnvSource:
                         value = value[1:-1]
                     self._data[normalise(key)] = value
         except FileNotFoundError:
-            pass
+            _log.warning("DotEnvSource: file not found: %s", path)
 
     def get(self, key: str) -> str | None:
         """Return the value for the normalised key."""
@@ -94,6 +97,7 @@ class YamlSource:
             with Path(path).open() as f:
                 raw = yaml.safe_load(f)
         except FileNotFoundError:
+            _log.warning("YamlSource: file not found: %s", path)
             return
 
         if isinstance(raw, dict):

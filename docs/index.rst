@@ -37,6 +37,7 @@ business code.
    guide/scopes
    guide/testing
    guide/fastapi
+   guide/logging
 
 .. toctree::
    :maxdepth: 2
