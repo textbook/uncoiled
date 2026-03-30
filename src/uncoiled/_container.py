@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import collections.abc
 import contextlib
 import importlib
 import inspect
 import logging
 import os
 import pkgutil
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast, get_args, get_origin
 
 from ._coercion import coerce
 from ._graph import ComponentNode, validate_graph
@@ -33,10 +34,33 @@ _log = logging.getLogger("uncoiled")
 _REQUEST_VALUE_SENTINEL: Callable[..., object] = cast("Callable[..., object]", object())
 
 
+_GENERATOR_ORIGINS: frozenset[type] = frozenset(
+    {
+        collections.abc.Generator,
+        collections.abc.AsyncGenerator,
+        collections.abc.Iterator,
+        collections.abc.AsyncIterator,
+    }
+)
+
+
 def _infer_return_type(fn: Callable[..., object]) -> type:
-    """Infer the provided type from a factory's return annotation."""
+    """Infer the provided type from a factory's return annotation.
+
+    For generator and async-generator factories, unwraps
+    ``Generator[T, ...]`` / ``AsyncGenerator[T, ...]`` (and the
+    corresponding iterator variants) to extract ``T``.
+    """
     hints = inspect.get_annotations(fn, eval_str=True)
     ret = hints.get("return")
+
+    if ret is not None and not isinstance(ret, type):
+        origin = get_origin(ret)
+        if origin in _GENERATOR_ORIGINS:
+            args = get_args(ret)
+            if args and isinstance(args[0], type):
+                return args[0]
+
     if ret is None or not isinstance(ret, type):
         name = getattr(fn, "__name__", repr(fn))
         msg = (
