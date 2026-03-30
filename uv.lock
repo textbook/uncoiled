@@ -1380,6 +1380,19 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-ty"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+    { name = "ty" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8f/d4/581d6b378c5ab19da30ee1578e0cfd4deece4ec30045b8dadc067cd24d24/pytest_ty-0.2.0.tar.gz", hash = "sha256:df45abb915ab15e67a0100e21d21819338737bf16a8599a0744327ed095859b5", size = 3924, upload-time = "2026-03-08T10:51:11.489Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e2/5f/bea08cb700e1cb853001b55261fa9a93a385f5cb34ad06dac2f5a8aaa596/pytest_ty-0.2.0-py3-none-any.whl", hash = "sha256:37ef33d1d18f47410cae1c0ea60056bad483bb7fc23cd1fa8043210f26e7ebef", size = 4949, upload-time = "2026-03-08T10:51:12.431Z" },
+]
+
+[[package]]
 name = "python-discovery"
 version = "1.1.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1863,6 +1876,7 @@ lint = [
 ]
 mutation = [
     { name = "cosmic-ray" },
+    { name = "pytest-ty" },
     { name = "tqdm" },
 ]
 test = [
@@ -1912,6 +1926,7 @@ lint = [
 ]
 mutation = [
     { name = "cosmic-ray", specifier = ">=8.4.4" },
+    { name = "pytest-ty", specifier = ">=0.2.0" },
     { name = "tqdm", specifier = ">=4.67.3" },
 ]
 test = [
