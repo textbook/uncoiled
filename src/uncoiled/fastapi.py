@@ -130,11 +130,11 @@ def uncoiled_lifespan(
             yield
             return
         app.state.uncoiled_container = container
-        container.start()
+        await container.astart()
         try:
             yield
         finally:
-            container.close()
+            await container.aclose()
 
     return _lifespan
 
