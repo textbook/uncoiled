@@ -138,13 +138,38 @@ Optional dependencies resolve to ``None`` when not registered:
        def __init__(self, cache: Cache | None = None) -> None:
            self.cache = cache
 
-List dependencies collect all implementations:
+List dependencies collect all implementations of a type, including
+registered subclasses:
 
 .. code-block:: python
 
    class EventBus:
        def __init__(self, handlers: list[EventHandler]) -> None:
            self.handlers = handlers
+
+If ``EventHandler`` is a base class and ``AuditHandler``,
+``LoggingHandler`` are registered as subclasses, the bus receives
+both.  The same resolution is available imperatively via
+:meth:`~uncoiled.Container.get_all`:
+
+.. code-block:: python
+
+   handlers = container.get_all(EventHandler)  # [AuditHandler(), LoggingHandler()]
+
+When combined with a qualifier, only implementations registered with that
+qualifier are returned:
+
+.. code-block:: python
+
+   class Pipeline:
+       def __init__(
+           self,
+           steps: Annotated[list[Step], Qualifier("pre")],
+       ) -> None:
+           self.steps = steps  # only Steps with qualifier="pre"
+
+List dependencies are never validated as missing --- an empty list is
+returned when no matching implementations are registered.
 
 Environment Variables
 ---------------------
