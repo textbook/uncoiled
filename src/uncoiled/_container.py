@@ -64,6 +64,7 @@ class Container:
         self._generators: list[_Generator] = []
         self._destroy_hooks: dict[tuple[type, str | None], str | None] = {}
         self._init_hooks: dict[tuple[type, str | None], str | None] = {}
+        self._type_index: dict[type, list[tuple[type, str | None]]] = {}
         self._started = False
 
     def register(  # noqa: PLR0913
@@ -291,6 +292,7 @@ class Container:
     def validate(self) -> None:
         """Validate the dependency graph eagerly."""
         validate_graph(self._registrations)
+        self._build_type_index()
 
     def visualise(self) -> str:
         """Render the dependency graph as a Mermaid flowchart.
@@ -383,14 +385,24 @@ class Container:
 
     def get_all[T](self, type_: type[T], qualifier: str | None = None) -> list[T]:
         """Resolve all registered implementations of the given type."""
+        if self._type_index:
+            return cast(
+                "list[T]",
+                [
+                    self._resolve(reg_type, qual)
+                    for reg_type, qual in self._type_index.get(type_, [])
+                    if qualifier is None or qual == qualifier
+                ],
+            )
+        # Fallback when called before validate/start.
         results: list[T] = []
-        for (reg_type, qual), node in self._registrations.items():
+        for reg_type, qual in self._registrations:
             if qualifier is not None and qual != qualifier:
                 continue
             if reg_type is type_ or (
                 isinstance(reg_type, type) and issubclass(reg_type, type_)
             ):
-                results.append(self._resolve(node.provides, qual))  # ty: ignore[invalid-argument-type]
+                results.append(cast("T", self._resolve(reg_type, qual)))
         return results
 
     def _resolve[T](self, type_: type[T], qualifier: str | None = None) -> T:
@@ -643,6 +655,16 @@ class Container:
                 f"Use astart() and aclose() instead."
             )
             raise TypeError(msg)
+
+    def _build_type_index(self) -> None:
+        """Build a reverse index mapping base types to registered subtypes."""
+        index: dict[type, list[tuple[type, str | None]]] = {}
+        for reg_type, qual in self._registrations:
+            if not isinstance(reg_type, type):
+                continue
+            for base in reg_type.__mro__:
+                index.setdefault(base, []).append((reg_type, qual))
+        self._type_index = index
 
     def _check_duplicate(
         self,
