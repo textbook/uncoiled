@@ -1288,6 +1288,22 @@ class TestGeneratorFactory:
         await c.aclose()
         assert cleanup_ran
 
+    @pytest.mark.anyio
+    async def test_async_generator_dependency_resolved_before_dependent(self) -> None:
+        """Async gen factory registered after its dependent must still resolve."""
+
+        async def create_repo() -> Repository:  # ty: ignore[invalid-return-type]
+            yield Repository()
+
+        c = Container()
+        # Register dependent first so dict order != dependency order
+        c.register(UserService)
+        c.register_factory(create_repo, return_type=Repository)
+        await c.astart()
+        svc = c.get(UserService)
+        assert isinstance(svc.repo, Repository)
+        await c.aclose()
+
     def test_async_generator_in_sync_resolution_raises(self) -> None:
         async def factory() -> Repository:  # ty: ignore[invalid-return-type]
             yield Repository()
