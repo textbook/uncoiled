@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -92,6 +93,19 @@ class TestConfigProperties:
         source = DictSource({})
         with pytest.raises(ValueError, match="Missing required"):
             bind_config(SvcConfig, source)
+
+    def test_unsupported_type_lists_supported(self) -> None:
+        @config_properties("svc")
+        @dataclass(frozen=True)
+        class SvcConfig:
+            id: uuid.UUID
+
+        source = DictSource({"svc.id": "abc"})
+        with pytest.raises(ValueError, match="Cannot coerce") as exc_info:
+            bind_config(SvcConfig, source)
+        cause = exc_info.value.__cause__
+        assert cause is not None
+        assert "Supported types:" in str(cause)
 
     def test_bind_config_invalid_int_shows_key(self) -> None:
         source = DictSource({"db.host": "localhost", "db.port": "not_a_number"})

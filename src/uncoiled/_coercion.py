@@ -51,5 +51,6 @@ def coerce(value: str, target: type) -> object:
     if coercer is not None:
         return coercer(value)
 
-    msg = f"Unsupported coercion target type: {target}"
+    supported = ", ".join(t.__name__ for t in _COERCIONS) + ", list"
+    msg = f"Unsupported coercion target type: {target}. Supported types: {supported}"
     raise ValueError(msg)
