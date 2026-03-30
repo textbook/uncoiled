@@ -232,29 +232,27 @@ class Container:
         seen: set[object],
     ) -> None:
         """Register ``@component`` classes and ``@factory`` callables."""
-        for _name, obj in inspect.getmembers(mod, inspect.isclass):
+        for _name, obj in inspect.getmembers(mod):
+            if not (inspect.isclass(obj) or inspect.isfunction(obj)):
+                continue
             if obj in seen:
                 continue
             meta: ComponentMetadata | None = getattr(obj, "__uncoiled__", None)
-            if meta is not None:
+            if inspect.isclass(obj):
+                if meta is not None:
+                    seen.add(obj)
+                    self.register(
+                        obj,
+                        scope=meta.scope,
+                        qualifier=meta.qualifier,
+                        provides=meta.provides,
+                    )
+                self._register_factory_classmethods(obj, seen)
+            elif meta is not None:
                 seen.add(obj)
-                self.register(
-                    obj,
-                    scope=meta.scope,
-                    qualifier=meta.qualifier,
-                    provides=meta.provides,
-                )
-            self._register_factory_classmethods(obj, seen)
-
-        for _name, fn in inspect.getmembers(mod, inspect.isfunction):
-            if fn in seen:
-                continue
-            meta = getattr(fn, "__uncoiled__", None)
-            if meta is not None:
-                seen.add(fn)
-                return_type = meta.provides or _infer_return_type(fn)
+                return_type = meta.provides or _infer_return_type(obj)
                 self.register_factory(
-                    fn,
+                    obj,
                     return_type=return_type,
                     scope=meta.scope,
                     qualifier=meta.qualifier,
