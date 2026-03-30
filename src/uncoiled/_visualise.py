@@ -62,8 +62,10 @@ def render_mermaid(
     # Define edges
     for (type_, qualifier), node in registrations.items():
         target_id = _node_id(type_, qualifier)
-        factory = node.factory if node.factory is not None else node.impl
-        deps = inspect_dependencies(factory)
+        deps = node.dependencies
+        if not deps:
+            factory = node.factory if node.factory is not None else node.impl
+            deps = inspect_dependencies(factory)
         for dep in deps:
             if dep.env_var is not None:
                 env_id = f"env_{dep.env_var}"

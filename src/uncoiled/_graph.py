@@ -37,8 +37,9 @@ def _collect_auto_deps(
     auto_deps: dict[tuple[type, str | None], list[tuple[type, str | None]]] = {}
     for key in auto_keys:
         node = registrations[key]
-        target = node.factory if node.factory is not None else node.impl
-        node.dependencies = inspect_dependencies(target)
+        if not node.dependencies:
+            target = node.factory if node.factory is not None else node.impl
+            node.dependencies = inspect_dependencies(target)
         auto_deps[key] = [
             (dep.required_type, dep.qualifier)
             for dep in node.dependencies
@@ -138,8 +139,9 @@ def build_graph(
         in_degree.setdefault(key, 0)
 
     for key, node in registrations.items():
-        target = node.factory if node.factory is not None else node.impl
-        node.dependencies = inspect_dependencies(target)
+        if not node.dependencies:
+            target = node.factory if node.factory is not None else node.impl
+            node.dependencies = inspect_dependencies(target)
         for dep in node.dependencies:
             dep_key = (dep.required_type, dep.qualifier)
 
