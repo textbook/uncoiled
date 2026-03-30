@@ -104,6 +104,24 @@ class TestContainerLogging:
             c.fork()
         assert "Forked container" in caplog.text
 
+    def test_empty_list_dependency_warns(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        class Handler:
+            pass
+
+        class Bus:
+            def __init__(self, handlers: list[Handler]) -> None:
+                self.handlers = handlers
+
+        c = Container()
+        c.register(Bus)
+        with caplog.at_level(logging.WARNING, logger="uncoiled"):
+            c.start()
+        assert "No implementations found" in caplog.text
+        assert "list[Handler]" in caplog.text
+
 
 class TestAutoScopeLogging:
     def test_auto_resolution_logs(self, caplog: pytest.LogCaptureFixture) -> None:

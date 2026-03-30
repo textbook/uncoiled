@@ -553,7 +553,16 @@ class Container:
         ):
             kwargs[dep.name] = logging.getLogger(node.impl.__module__)
         elif dep.is_list:
-            kwargs[dep.name] = self.get_all(dep.required_type, dep.qualifier)
+            items: list[object] = self.get_all(dep.required_type, dep.qualifier)
+            if not items:
+                _log.warning(
+                    "No implementations found for list dependency "
+                    "%s.%s: list[%s] (injecting empty list)",
+                    node.impl.__name__,
+                    dep.name,
+                    dep.required_type.__name__,
+                )
+            kwargs[dep.name] = items
         elif dep.optional or dep.has_default:
             dep_key = (dep.required_type, dep.qualifier)
             if dep_key in self._registrations:
