@@ -13,6 +13,7 @@ class FailureKind(enum.Enum):
     CIRCULAR = "circular"
     SCOPE_MISMATCH = "scope_mismatch"
     AUTO_CYCLE = "auto_cycle"
+    ASYNC_GENERATOR = "async_generator"
 
 
 @dataclass(frozen=True)

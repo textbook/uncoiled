@@ -308,6 +308,7 @@ class Container:
     def start(self) -> None:
         """Validate the graph and instantiate all singletons."""
         _log.debug("Container starting (%d registrations)", len(self._registrations))
+        self._check_async_generators()
         self.validate()
         singleton = self._scopes[Scope.SINGLETON]
         for key, node in self._registrations.items():
@@ -627,6 +628,21 @@ class Container:
         if not hasattr(target, method_name):
             msg = f"{kind} '{method_name}' does not exist on {target.__name__}"
             raise ValueError(msg)
+
+    def _check_async_generators(self) -> None:
+        """Raise if any factory is an async generator (sync start only)."""
+        names = [
+            node.provides.__name__
+            for node in self._registrations.values()
+            if node.factory is not None and inspect.isasyncgenfunction(node.factory)
+        ]
+        if names:
+            msg = (
+                f"Async generator factories cannot be used with "
+                f"synchronous start(): {', '.join(names)}. "
+                f"Use astart() and aclose() instead."
+            )
+            raise TypeError(msg)
 
     def _check_duplicate(
         self,
