@@ -19,6 +19,7 @@ import tempfile
 from argparse import Namespace
 from collections.abc import Iterator
 from contextlib import contextmanager, redirect_stdout
+from datetime import UTC, datetime
 from io import StringIO
 
 import tqdm
@@ -121,14 +122,15 @@ with use_db(MUTATION_DIR / "state.sqlite", mode=WorkDB.Mode.create) as work_db:
         survival_rate(work_db),
     )
 
-    report_path = MUTATION_DIR / "index.html"
+    doc: yattag.Doc = _generate_html_report(
+        work_db,
+        hide_skipped=False,
+        only_completed=False,
+        skip_success=False,
+    )
+
+    report_path = MUTATION_DIR / f"index-{int(datetime.now(UTC).timestamp()):d}.html"
     with report_path.open(mode="w") as report:
-        doc: yattag.Doc = _generate_html_report(
-            work_db,
-            hide_skipped=False,
-            only_completed=False,
-            skip_success=False,
-        )
         report.write(doc.getvalue())
         logger.info("HTML report created")
         print(report_path)  # noqa: T201

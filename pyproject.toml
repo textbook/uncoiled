@@ -37,6 +37,7 @@ docs = [
 ]
 mutation = [
     "cosmic-ray>=8.4.4",
+    "pytest-ty>=0.2.0",
     "tqdm>=4.67.3",
 ]
 test = [

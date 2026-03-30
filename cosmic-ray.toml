@@ -2,7 +2,7 @@
 module-path = "src/uncoiled"
 timeout = 30.0
 excluded-modules = []
-test-command = "python -m pytest tests/ -x -q --no-header --tb=no"
+test-command = "python -m pytest tests/ src/uncoiled/ -x -q --no-header --tb=no --ty"
 
 [cosmic-ray.distributor]
 name = "local"
