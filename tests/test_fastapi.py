@@ -324,3 +324,44 @@ class TestUncoiledLifespan:
             await client.get("/nonexistent")
 
         assert app.state.uncoiled_container is test_container
+
+    @pytest.mark.anyio
+    async def test_lifespan_supports_async_generator_factory(self) -> None:
+        class Pool:
+            pass
+
+        cleanup_ran = False
+
+        async def create_pool() -> Pool:  # ty: ignore[invalid-return-type]
+            nonlocal cleanup_ran
+            yield Pool()
+            cleanup_ran = True
+
+        c = Container()
+        c.register_factory(create_pool, return_type=Pool)
+        app = FastAPI()
+        lifespan = uncoiled_lifespan(c)
+
+        async with lifespan(app):
+            pool = c.get(Pool)
+            assert pool is not None
+
+        assert cleanup_ran
+
+    @pytest.mark.anyio
+    async def test_lifespan_calls_async_disposable(self) -> None:
+        class AsyncResource:
+            closed = False
+
+            async def aclose(self) -> None:
+                self.closed = True
+
+        c = Container()
+        c.register(AsyncResource)
+        app = FastAPI()
+        lifespan = uncoiled_lifespan(c)
+
+        async with lifespan(app):
+            res = c.get(AsyncResource)
+
+        assert res.closed
