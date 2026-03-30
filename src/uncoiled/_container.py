@@ -28,6 +28,8 @@ if TYPE_CHECKING:
     _Generator = types.GeneratorType[Any, Any, Any] | types.AsyncGeneratorType[Any, Any]
 
 
+_log = logging.getLogger("uncoiled")
+
 _REQUEST_VALUE_SENTINEL: Callable[..., object] = cast("Callable[..., object]", object())
 
 
@@ -94,6 +96,12 @@ class Container:
         if destroy_method:
             self._check_lifecycle_method(cls, destroy_method, "destroy_method")
             self._destroy_hooks[(cls, qualifier)] = destroy_method
+        _log.debug(
+            "Registered component %s (scope=%s, qualifier=%s)",
+            cls.__name__,
+            scope.value,
+            qualifier,
+        )
 
     def register_instance(
         self,
@@ -117,6 +125,11 @@ class Container:
         self._instances.append((instance, type_, qualifier))
         if destroy_method:
             self._destroy_hooks[(type_, qualifier)] = destroy_method
+        _log.debug(
+            "Registered instance of %s (qualifier=%s)",
+            type_.__name__,
+            qualifier,
+        )
 
     def register_factory(  # noqa: PLR0913
         self,
@@ -146,6 +159,12 @@ class Container:
             self._init_hooks[(return_type, qualifier)] = init_method
         if destroy_method:
             self._destroy_hooks[(return_type, qualifier)] = destroy_method
+        _log.debug(
+            "Registered factory for %s (scope=%s, qualifier=%s)",
+            return_type.__name__,
+            scope.value,
+            qualifier,
+        )
 
     def register_request_value(
         self,
@@ -190,6 +209,7 @@ class Container:
         """Scan modules for ``@component`` classes and ``@factory`` callables."""
         for module in modules:
             mod = importlib.import_module(module) if isinstance(module, str) else module
+            _log.debug("Scanning module %s", mod.__name__)
             self._scan_module(mod)
 
     def _scan_module(self, mod: ModuleType) -> None:
@@ -287,6 +307,7 @@ class Container:
 
     def start(self) -> None:
         """Validate the graph and instantiate all singletons."""
+        _log.debug("Container starting (%d registrations)", len(self._registrations))
         self.validate()
         singleton = self._scopes[Scope.SINGLETON]
         for key, node in self._registrations.items():
@@ -296,9 +317,14 @@ class Container:
             ):
                 self._resolve(node.provides, key[1])
         self._started = True
+        _log.debug("Container started")
 
     async def astart(self) -> None:
         """Validate the graph and instantiate all singletons (async)."""
+        _log.debug(
+            "Container starting async (%d registrations)",
+            len(self._registrations),
+        )
         self.validate()
         singleton = self._scopes[Scope.SINGLETON]
         for key, node in self._registrations.items():
@@ -308,9 +334,11 @@ class Container:
             ):
                 await self._aresolve(node.provides, key[1])
         self._started = True
+        _log.debug("Container started")
 
     def close(self) -> None:
         """Destroy instances in reverse creation order."""
+        _log.debug("Container closing (%d instances)", len(self._instances))
         errors: list[Exception] = []
         for instance, impl, qualifier in reversed(self._instances):
             try:
@@ -330,6 +358,7 @@ class Container:
 
     async def aclose(self) -> None:
         """Destroy instances in reverse creation order (async)."""
+        _log.debug("Container closing async (%d instances)", len(self._instances))
         errors: list[Exception] = []
         for instance, impl, qualifier in reversed(self._instances):
             try:
@@ -380,6 +409,12 @@ class Container:
                 return cached
 
         instance = self._create_instance(node)
+        _log.debug(
+            "Created %s (scope=%s, qualifier=%s)",
+            type_.__name__,
+            node.scope.value,
+            qualifier,
+        )
 
         if scope_manager:
             scope_manager.put(type_, instance, qualifier)
@@ -408,6 +443,12 @@ class Container:
                 return cached
 
         instance = await self._acreate_instance(node)
+        _log.debug(
+            "Created %s (scope=%s, qualifier=%s)",
+            type_.__name__,
+            node.scope.value,
+            qualifier,
+        )
 
         if scope_manager:
             scope_manager.put(type_, instance, qualifier)
@@ -532,6 +573,8 @@ class Container:
         # Remove existing cache entry so the override takes effect
         singleton.remove(type_, qualifier)
 
+        _log.debug("Overriding %s (qualifier=%s)", type_.__name__, qualifier)
+
         # Install the replacement
         if isinstance(replacement, type):
             self.register(
@@ -575,6 +618,7 @@ class Container:
         child._registrations = dict(self._registrations)
         child._init_hooks = dict(self._init_hooks)
         child._destroy_hooks = dict(self._destroy_hooks)
+        _log.debug("Forked container (%d registrations)", len(self._registrations))
         return child
 
     @staticmethod
