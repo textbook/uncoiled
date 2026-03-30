@@ -89,3 +89,7 @@ ignore = [
 "docs/**" = [
     "INP001",
 ]
+
+[tool.ty.rules]
+# type: ignore comments are for mypy, not ty — don't flag them as unused
+unused-type-ignore-comment = "ignore"
